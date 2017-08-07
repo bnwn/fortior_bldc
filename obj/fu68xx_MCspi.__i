@@ -1,0 +1,1 @@
+"User\Source\fu68xx_MCspi.c" LARGE OMF2 WARNINGLEVEL (0) OPTIMIZE (SIZE) BROWSE NOAREGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\fu68xx_MCspi.lst) TABS (2) OBJECT(.\obj\fu68xx_MCspi.obj)

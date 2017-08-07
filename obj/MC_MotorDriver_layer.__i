@@ -1,0 +1,1 @@
+"User\Source\MC_MotorDriver_layer.c" LARGE OMF2 WARNINGLEVEL (0) OPTIMIZE (SIZE) BROWSE NOAREGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\MC_MotorDriver_layer.lst) TABS (2) OBJECT(.\obj\MC_MotorDriver_layer.obj)

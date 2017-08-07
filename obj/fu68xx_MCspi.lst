@@ -1,0 +1,150 @@
+C51 COMPILER V9.52.0.0   FU68XX_MCSPI                                                      08/07/2017 14:18:21 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE FU68XX_MCSPI
+OBJECT MODULE PLACED IN .\obj\fu68xx_MCspi.obj
+COMPILER INVOKED BY: C:\Keil_v4\C51\BIN\C51.EXE User\Source\fu68xx_MCspi.c LARGE OMF2 WARNINGLEVEL(0) OPTIMIZE(SIZE) BRO
+                    -WSE NOAREGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\fu68xx_MCspi.lst) TABS(2) OBJECT(.\obj\fu68xx_MCs
+                    -pi.obj)
+
+line level    source
+
+   1          
+   2          /************************ (C) COPYRIGHT 2015 FT *******************************
+   3          * File Name          : 
+   4          * Author             : Application Team  Tom.wang 
+   5          * Version            : V2.0.0
+   6          * Date               : 06/15/2015
+   7          * Description        : 
+   8          ********************************************************************************
+   9          /*******************************************************************************
+  10          * All Rights Reserved
+  11          *******************************************************************************/
+  12          
+  13          /* Includes ------------------------------------------------------------------*/
+  14          #include <FU68xx.h>
+  15          #include "sys_conf.h"
+  16          #include "fu68xx_MCspi.h"
+  17          /* Private typedef -----------------------------------------------------------*/
+  18          /* Private define ------------------------------------------------------------*/
+  19          /* Private macro -------------------------------------------------------------*/
+  20          /* Private variables ---------------------------------------------------------*/
+  21          /* Private function prototypes -----------------------------------------------*/
+  22          /* Private functions ---------------------------------------------------------*/
+  23          
+  24          /*******************************************************************************
+  25          * Function Name  : SPI_Init
+  26          * Description    : SPI初始化配置
+  27          * Input          : None
+  28          * Output         : None
+  29          * Return         : None
+  30          *******************************************************************************/
+  31          void SPI_Config(void)
+  32          {
+  33   1        SetBit(SPI_CTRL, SPIEN, 0);                              // 0,disable SPI;1 enable
+  34   1      
+  35   1        /*-------------------------------------------------------------------------------------------------
+  36   1        SPI管脚配置
+  37   1        1、禁止UART复用，P06配置为MISO，P05配置为MOSI
+  38   1        2、禁止比较器输出复用，P07配置为SCLK
+  39   1        -------------------------------------------------------------------------------------------------*/
+  40   1        SetBit(PH_SEL, UT1EN, 0);                                // 0,P06 as GPIO or SPI_MISO,P05 as GPIO or SPI_MOSI;1
+             -,P06 and p07 as USART
+  41   1        SetBit(CMP_CR2, CMPOE, 0);                               // P07 as GPIO or SPI_SCLK
+  42   1          
+  43   1        /*-------------------------------------------------------------------------------------------------
+  44   1        SPI时钟相位/极性配置
+  45   1        CPHA = 0, CPOL = 0:上升沿接收，下降沿发送，空闲电平为低
+  46   1        CPHA = 0, CPOL = 1:上升沿发送，下降沿接收，空闲电平为高
+  47   1        CPHA = 1, CPOL = 0:上升沿发送，下降沿接收，空闲电平为低
+  48   1        CPHA = 1, CPOL = 1:上升沿接收，下降沿发送，空闲电平为高
+  49   1        -------------------------------------------------------------------------------------------------*/
+  50   1        SetBit(SPI_CFG, CKPHA, 0);                
+  51   1        SetBit(SPI_CFG, CKPOL, 1);                  
+  52   1      
+C51 COMPILER V9.52.0.0   FU68XX_MCSPI                                                      08/07/2017 14:18:21 PAGE 2   
+
+  53   1        /*-------------------------------------------------------------------------------------------------
+  54   1        SPI从方式选择配置
+  55   1        00：3线从方式或3线主方式，NSS信号不连到端口管脚
+  56   1        01：4线从方式或4线多主方式，NSS配置为输入
+  57   1        1x：4线单主方式，NSS配置为输出，NSS信号输出x电平
+  58   1        -------------------------------------------------------------------------------------------------*/
+  59   1        SetBit(SPI_CTRL, NSSMID1, 1);               
+  60   1        SetBit(SPI_CTRL, NSSMID0, 1);               
+  61   1      
+  62   1        SetBit(SPI_CFG, MSTEN, 1);                               // 0:Slave, 1:Master
+  63   1      
+  64   1        /*-------------------------------------------------------------------------------------------------
+  65   1        SPI中断配置
+  66   1        SPIF：SPI字节传输完成中断标志，硬件置位，软件清零
+  67   1        WCOL：SPI写冲突中断（发送缓冲器非空时写操作），硬件置位，软件清零
+  68   1        MODF：SPI方式错误中断（多主方式NSS被拉低，MSTEN和SPIEN被清零）硬件置位，软件清零
+  69   1        RXOVRN：SPI接收溢出中断（SPI接收缓冲器接收溢出），硬件置位，软件清零
+  70   1        -------------------------------------------------------------------------------------------------*/
+  71   1        SetBit(SPI_CTRL, SPIF, 0);                               // SPI传输完成中断标志
+  72   1        SetBit(SPI_CTRL, WCOL, 0);                               // SPI写冲突中断标志
+  73   1        SetBit(SPI_CTRL, MODF, 0);                               // SPI方式错误中断标志
+  74   1        SetBit(SPI_CTRL, RXOVRN, 0);                             // SPI接受溢出中断
+  75   1        SPIIE = 0;                                               // SPI中断使能 
+  76   1      
+  77   1        SPI_SCR = 1;                                             // Fspi = Fcpu / (2*(SPI_SCR + 1)) = 6MHz  
+  78   1      
+  79   1        SetBit(SPI_CTRL, SPIEN, 1);                              // enable SPI  
+  80   1      
+  81   1      }
+  82          
+  83          /*-------------------------------------------------------------------------------------------------
+  84            Function Name : void SPI_SendData(uint16 Data, uint8 Channel)
+  85            Description   : SPI传输数据
+  86            Input         : Data--传输数据，uint16格式
+  87            Output        : Channel--传输通道，取值0~3
+  88          -------------------------------------------------------------------------------------------------*/
+  89          void SPI_SendData(uint16 Data, uint8 ch)
+  90          {
+  91   1        if(!GetBit(SPI_CFG, SPIBSY))
+  92   1        {
+  93   2          SetBit(SPI_CTRL, NSSMID0, 1);
+  94   2          Data = Data >> 4 + 0x1000;
+  95   2          switch(ch)
+  96   2          {
+  97   3            case 0:
+  98   3              Data &= 0x3fff;
+  99   3              break;
+ 100   3            case 1:
+ 101   3              Data |= 0x4000;
+ 102   3              break;
+ 103   3            case 2:
+ 104   3              Data |= 0x8000;
+ 105   3              break;
+ 106   3            case 3:
+ 107   3              Data |= 0xc000;
+ 108   3              break;
+ 109   3            default:
+ 110   3              break;
+ 111   3          } 
+ 112   2          SetBit(SPI_CTRL, NSSMID0, 0); 
+ 113   2          SPI_DAT = Data>>8;
+ 114   2          SPI_DAT = Data; 
+C51 COMPILER V9.52.0.0   FU68XX_MCSPI                                                      08/07/2017 14:18:21 PAGE 3   
+
+ 115   2        }
+ 116   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    158    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

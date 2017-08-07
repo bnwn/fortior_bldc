@@ -1,0 +1,177 @@
+C51 COMPILER V9.52.0.0   MC_BEEP                                                           08/07/2017 14:18:19 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE MC_BEEP
+OBJECT MODULE PLACED IN .\obj\MC_Beep.obj
+COMPILER INVOKED BY: C:\Keil_v4\C51\BIN\C51.EXE User\Source\MC_Beep.c LARGE OMF2 WARNINGLEVEL(0) OPTIMIZE(SIZE) BROWSE N
+                    -OAREGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\MC_Beep.lst) TABS(2) OBJECT(.\obj\MC_Beep.obj)
+
+line level    source
+
+   1          
+   2          /************************ (C) COPYRIGHT 2015 FT *******************************
+   3          * File Name          : 
+   4          * Author             : Application Team  Tom.wang 
+   5          * Version            : V2.0.0
+   6          * Date               : 06/15/2015
+   7          * Description        : 
+   8          ********************************************************************************
+   9          /*******************************************************************************
+  10          * All Rights Reserved
+  11          *******************************************************************************/
+  12          
+  13          /* Includes ------------------------------------------------------------------*/
+  14          #include <FU68xx.h>
+  15          #include <Myproject.h>
+  16          
+  17          //do re mi fa so la ti do
+  18          //C:261.6256     229
+  19          //D:293.6648     204
+  20          //E:329.6276     182
+  21          //F:349.2282     171
+  22          //G:391.9954     153
+  23          //A:440          136
+  24          //B:493.8833     121
+  25          uc8 BeepNote[7] = {229,204,182,171,153,136,121};
+  26          Beep_TypeDef xdata Beep;
+  27          
+  28          void BeepRequestFun(u8 mold);
+  29          u8 BeepResponse(void);
+  30          void Beepperform(void);
+  31          /*-------------------------------------------------------------------------------------------------
+  32            Function Name : void BeepInit(void)
+  33            Description   : 发声控制初始化
+  34            Input         : 无
+  35            Output        : 无
+  36          -------------------------------------------------------------------------------------------------*/
+  37          void BeepInit(void)
+  38          {
+  39   1        Beep.BeepRequest = 0xFF;
+  40   1        Beep.BeepType = 0;
+  41   1      }
+  42          
+  43          void BeepTone(u8 tBeepNote,float tvolume,u16 time)
+  44          {
+  45   1        u16 i;
+  46   1        #if(BEEPSCAN_EN)
+  47   1        EA = 0;
+  48   1        if(tBeepNote > 7)
+  49   1        {
+  50   2          tBeepNote = 7;
+  51   2        }
+  52   1        if(tvolume > 1.0)
+  53   1        {
+  54   2          tvolume = 1.0;
+C51 COMPILER V9.52.0.0   MC_BEEP                                                           08/07/2017 14:18:19 PAGE 2   
+
+  55   2        }
+  56   1        tBeepNote = BeepNote[tBeepNote]*tvolume*BEEP_VOL;
+  57   1        for(i=0; i< time;i++)
+  58   1        {
+  59   2          PWM_UHVL_ON;
+  60   2          Delay(tBeepNote);
+  61   2          PWMOUT_OFF;
+  62   2          Delay(tBeepNote*3);
+  63   2          PWM_VHUL_ON;
+  64   2          Delay(tBeepNote);
+  65   2          PWMOUT_OFF;
+  66   2          Delay(tBeepNote*3);
+  67   2        }
+  68   1        EA = 1;
+  69   1        #endif
+  70   1      }
+  71          
+  72          void Beepperform(void)
+  73          {
+  74   1        u16 i,k;
+  75   1        u8 j,tBeepNote;
+  76   1        for(k=0; k< 1;k++)
+  77   1        {
+  78   2          for(j=0; j< 3;j++)
+  79   2          {
+  80   3            BeepTone(j,0.4,500);
+  81   3          }
+  82   2          //Delay(20000);
+  83   2        }
+  84   1        EA = 0;
+  85   1        Delayus(10000);
+  86   1        EA = 1;
+  87   1        Beep.BeepType = BeepDone;
+  88   1      }
+  89          
+  90          u8 BeepResponse(void)
+  91          {
+  92   1        #if(BEEPSCAN_EN)
+  93   1        if(Beep.BeepRequest == 0x7F)
+  94   1        {
+  95   2          switch(Beep.BeepType)
+  96   2          {
+  97   3            case PWMINAline:
+  98   3              BeepTone(1,0.3,1000);
+  99   3              EA = 0;
+ 100   3              Delayus(5000);
+ 101   3              EA = 1;
+ 102   3              BeepTone(1,0.3,1000);
+ 103   3              PWMINCtl.FlagPWMAline = 0xFF;
+ 104   3              Beep.BeepRequest = 0xFF;
+ 105   3            break;
+ 106   3            case PWMINReady:
+ 107   3              BeepTone(1,0.3,1500);
+ 108   3              Beep.BeepRequest = 0xFF;
+ 109   3              PWMINCtl.FlagPwmIn = 0xFF;
+ 110   3            break;
+ 111   3            case PWMINError:
+ 112   3              BeepTone(1,0.2,1000);
+ 113   3              EA = 0;
+ 114   3              Delayus(20000);
+ 115   3              EA = 1;
+ 116   3              BeepTone(1,0.2,1000);
+C51 COMPILER V9.52.0.0   MC_BEEP                                                           08/07/2017 14:18:19 PAGE 3   
+
+ 117   3              break;    
+ 118   3            case SelfInspection:
+ 119   3              Beepperform();
+ 120   3              Beep.BeepType = BeepDone;
+ 121   3              break; 
+ 122   3            case BeepDone:
+ 123   3              break;      
+ 124   3            default:
+ 125   3              break;
+ 126   3          }
+ 127   2        }
+ 128   1        Beep.BeepRequest = 0xFF;
+ 129   1        #else
+                PWMINCtl.FlagPwmIn = 0xFF;
+                #endif
+ 132   1      }
+ 133          
+ 134          void BeepRequestFun(u8 mold)
+ 135          { 
+ 136   1        if(Beep.BeepRequest == 0xFF)
+ 137   1        {
+ 138   2          Beep.BeepRequest = 0x7F;
+ 139   2          Beep.BeepType = mold;
+ 140   2          if(Beep.BeepType == PWMINAline)
+ 141   2          {
+ 142   3            PWMINCtl.FlagPWMAline = 0x7F;
+ 143   3          }
+ 144   2        }
+ 145   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    530    ----
+   CONSTANT SIZE    =      7    ----
+   XDATA SIZE       =      2      15
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,81 @@
+C51 COMPILER V9.52.0.0   FU68XX_MCAMP                                                      08/07/2017 14:18:20 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE FU68XX_MCAMP
+OBJECT MODULE PLACED IN .\obj\fu68xx_MCamp.obj
+COMPILER INVOKED BY: C:\Keil_v4\C51\BIN\C51.EXE User\Source\fu68xx_MCamp.c LARGE OMF2 WARNINGLEVEL(0) OPTIMIZE(SIZE) BRO
+                    -WSE NOAREGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\fu68xx_MCamp.lst) TABS(2) OBJECT(.\obj\fu68xx_MCa
+                    -mp.obj)
+
+line level    source
+
+   1          
+   2          /************************ (C) COPYRIGHT 2015 FT *******************************
+   3          * File Name          : 
+   4          * Author             : Application Team  Tom.wang 
+   5          * Version            : V2.0.0
+   6          * Date               : 06/15/2015
+   7          * Description        : 
+   8          ********************************************************************************
+   9          /*******************************************************************************
+  10          * All Rights Reserved
+  11          *******************************************************************************/
+  12          
+  13          /* Includes ------------------------------------------------------------------*/
+  14          #include <FU68xx.h>
+  15          #include "sys_conf.h" 
+  16          #include "fu68xx_MCamp.h"
+  17          /* Private typedef -----------------------------------------------------------*/
+  18          /* Private define ------------------------------------------------------------*/
+  19          /* Private macro -------------------------------------------------------------*/
+  20          /* Private variables ---------------------------------------------------------*/
+  21          /* Private function prototypes -----------------------------------------------*/
+  22          /* Private functions ---------------------------------------------------------*/
+  23          
+  24          /*******************************************************************************
+  25          * Function Name  : main
+  26          * Description    : Main program.
+  27          * Input          : None
+  28          * Output         : None
+  29          * Return         : None
+  30          *******************************************************************************/
+  31          void AMP_Config(void)
+  32          {
+  33   1        /*AMP管脚配置----------------------------------------------------------------------*/
+  34   1        SetBit(P2_AN, P27, 1);
+  35   1        SetBit(P3_AN, P30, 1);
+  36   1        SetBit(P3_AN, P31, 1);      // AMP0
+  37   1      
+  38   1        //SetBit(P1_AN, P16, 1);
+  39   1        //SetBit(P1_AN, P17, 1);
+  40   1        //SetBit(P2_AN, P20, 1);    // AMP1
+  41   1      
+  42   1        //SetBit(P2_AN, P21, 1);
+  43   1        //SetBit(P2_AN, P22, 1);
+  44   1        //SetBit(P2_AN, P23, 1);    // AMP2
+  45   1      
+  46   1        /*运放使能-----------------------------------------------------------------------*/
+  47   1        SetBit(AMP_CR, AMP0EN, 1);  
+  48   1        //SetBit(AMP_CR, AMP1EN, 1);
+  49   1        //SetBit(AMP_CR, AMP2EN, 1);
+  50   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+C51 COMPILER V9.52.0.0   FU68XX_MCAMP                                                      08/07/2017 14:18:20 PAGE 2   
+
+   CODE SIZE        =     24    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

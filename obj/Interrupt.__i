@@ -1,0 +1,1 @@
+"User\Source\Interrupt.c" LARGE OMF2 WARNINGLEVEL (0) OPTIMIZE (SIZE) BROWSE NOAREGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\Interrupt.lst) TABS (2) OBJECT(.\obj\Interrupt.obj)

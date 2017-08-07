@@ -1,0 +1,75 @@
+C51 COMPILER V9.52.0.0   FU68XX_MCUART                                                     08/07/2017 14:18:21 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE FU68XX_MCUART
+OBJECT MODULE PLACED IN .\obj\fu68xx_MCuart.obj
+COMPILER INVOKED BY: C:\Keil_v4\C51\BIN\C51.EXE User\Source\fu68xx_MCuart.c LARGE OMF2 WARNINGLEVEL(0) OPTIMIZE(SIZE) BR
+                    -OWSE NOAREGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\fu68xx_MCuart.lst) TABS(2) OBJECT(.\obj\fu68xx_M
+                    -Cuart.obj)
+
+line level    source
+
+   1          
+   2          /************************ (C) COPYRIGHT 2015 FT *******************************
+   3          * File Name          : 
+   4          * Author             : Application Team  Tom.wang 
+   5          * Version            : V2.0.0
+   6          * Date               : 06/15/2015
+   7          * Description        : 
+   8          ********************************************************************************
+   9          /*******************************************************************************
+  10          * All Rights Reserved
+  11          *******************************************************************************/
+  12          
+  13          /* Includes ------------------------------------------------------------------*/
+  14          #include <FU68xx.h>
+  15          #include "sys_conf.h"
+  16          #include "fu68xx_uart.h"
+  17          /* Private typedef -----------------------------------------------------------*/
+  18          /* Private define ------------------------------------------------------------*/
+  19          /* Private macro -------------------------------------------------------------*/
+  20          /* Private variables ---------------------------------------------------------*/
+  21          /* Private function prototypes -----------------------------------------------*/
+  22          /* Private functions ---------------------------------------------------------*/
+  23          
+  24          /*******************************************************************************
+  25          * Function Name  : main
+  26          * Description    : Main program.
+  27          * Input          : None
+  28          * Output         : None
+  29          * Return         : None
+  30          *******************************************************************************/
+  31          void USRT_Config(void)
+  32          {
+  33   1        
+  34   1      }
+  35          
+  36          void UART_SendData(unsigned int T_Data)
+  37          {
+  38   1        UT_DR = T_Data >> 8;
+  39   1        while(!(TI==1));    //等待发送完成
+  40   1        TI = 0;             //发送完成中断标志位清零
+  41   1        UT_DR = T_Data;
+  42   1        while(!(TI==1));    //等待发送完成
+  43   1        TI = 0;             //发送完成中断标志位清零
+  44   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     38    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+C51 COMPILER V9.52.0.0   FU68XX_MCUART                                                     08/07/2017 14:18:21 PAGE 2   
+
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

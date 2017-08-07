@@ -1,0 +1,339 @@
+C51 COMPILER V9.52.0.0   MC_USERINTERFACE_LAYER                                            08/07/2017 14:18:18 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE MC_USERINTERFACE_LAYER
+OBJECT MODULE PLACED IN .\obj\MC_UserInterface_layer.obj
+COMPILER INVOKED BY: C:\Keil_v4\C51\BIN\C51.EXE User\Source\MC_UserInterface_layer.c LARGE OMF2 WARNINGLEVEL(0) OPTIMIZE
+                    -(SIZE) BROWSE NOAREGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\MC_UserInterface_layer.lst) TABS(2) OBJ
+                    -ECT(.\obj\MC_UserInterface_layer.obj)
+
+line level    source
+
+   1          
+   2          /************************ (C) COPYRIGHT 2015 FT *******************************
+   3          * File Name          : 
+   4          * Author             : Application Team  Tom.wang 
+   5          * Version            : V2.0.0
+   6          * Date               : 06/15/2015
+   7          * Description        : 
+   8          ********************************************************************************
+   9          /*******************************************************************************
+  10          * All Rights Reserved
+  11          *******************************************************************************/
+  12          
+  13          /* Includes ------------------------------------------------------------------*/
+  14          #include <FU68xx.h>
+  15          #include <Myproject.h>
+  16          
+  17          /** @addtogroup FT68xx
+  18            * @{
+  19            */
+  20          
+  21          /* Private typedef -----------------------------------------------------------*/
+  22          /* Private define ------------------------------------------------------------*/
+  23          /* Private macro -------------------------------------------------------------*/
+  24          /* Private variables ---------------------------------------------------------*/
+  25          Uc_TypeDef xdata Uc;              //±äÁ¿¶¨Òå
+  26          
+  27          //_iq xdata SpeedCoefficient;     //ËÙ¶ÈÏµÊý extern u8 xdata WriteRomValue;
+  28          extern u8 xdata ReadRomValue;
+  29          extern u8 xdata u8KeyForbid;  
+  30          extern u8 xdata *PageRomAdress;//ROMÒ³µØÖ·
+  31          
+  32          /* Private function prototypes -----------------------------------------------*/void UI(void);         //
+             -È«¾Öº¯Êý  ÉùÃ÷
+  33          
+  34          /* Private functions ---------------------------------------------------------*/
+  35          
+  36          /*******************************************************************************
+  37          * Function Name  : UI
+  38          * Description    : a¡¢¹ÊÕÏÖ¸Ê¾¡¢ÎÂ¶È¼ÆËã¡¢ADC×ª»»¡¢ËÙ¶ÈÊµ¼ÊÖµ¼ÆËã 
+  39                             b¡¢Õý·´×ªÃüÁî¸ø¶¨¡¢ËÙ¶ÈÃüÁî¸ø¶¨
+  40                             c¡¢ÃüÁîÖ´ÐÐ
+  41          * Input          : None
+  42          * Output         : None
+  43          * Return         : None
+  44          *******************************************************************************/
+  45          void UI(void)        //º¯Êý¶¨Òå
+  46          {   
+  47   1      //-----------------------------------------
+  48   1      //hall¶ÁÈ¡
+  49   1        //Drv.Hall.Status = Hall_IRQHandler();
+  50   1        
+  51   1      //-----------------------------------------
+  52   1      //¹ÊÕÏÖ¸Ê¾
+C51 COMPILER V9.52.0.0   MC_USERINTERFACE_LAYER                                            08/07/2017 14:18:18 PAGE 2   
+
+  53   1        Fault_Led(Ctl.SysError);
+  54   1        
+  55   1      //-----------------------------------------
+  56   1      //µµÎ»Ö¸Ê¾£¬µçÁ¿ÏÔÊ¾
+  57   1        LED_show();
+  58   1        
+  59   1      //-----------------------------------------
+  60   1      //ADCÊµ¼ÊÖµ×ª»»
+  61   1        ADCGetConversionValue();
+  62   1      
+  63   1      //-----------------------------------------  
+  64   1      //Êµ¼Ê×ªËÙ rpm 
+  65   1      #if (SPEED_CALC_EN == 2)
+                MDUControl.FlagCalcSpeedRpm = 0x7F;    
+              #endif
+  68   1      //-----------------------------------------
+  69   1      //¹ýÔØÅÐ¶Ï
+  70   1      #if(OVERLOAD_EN) 
+                Ctl.OL.Value = MCL_OverLoadCalc(Drv.AdcMeas.ImeasBus);
+              #endif
+  73   1      
+  74   1      //-----------------------------------------
+  75   1      //ÎÂ¶È¼ÆËã  
+  76   1      #if(OH1_EN)
+                Drv.AdcMeas.Therm1 = Drv_PowerThermCalc(Drv.AdcMeas.Vth1);
+                if(Drv.AdcMeas.Therm1 == 200)
+                {
+                  Drv.AdcMeas.Therm1 = 25;
+                }
+              #endif
+  83   1      
+  84   1      #if(OH2_EN)
+                Drv.AdcMeas.Therm2 = Drv_PowerThermCalc(Drv.AdcMeas.Vth2);
+                //Drv.AdcMeas.Therm3 = Drv_PowerThermCalc(Drv.AdcMeas.Vth3);
+                #endif
+  88   1        
+  89   1        //Mcl_NoloadCale();//ÅÐ¶Ïµç»úÊÇ·ñ¿ÕÔØ   Ctl.Noload.Flag = 0x7F ¿ÕÔØ OXFF´øÔØ
+  90   1      #if(BEEPSCAN_EN)
+  91   1        BeepResponse();
+  92   1      #endif//=====================================================
+  93   1      //¿ª¹Ø»ú ÃüÁî  ËÙ¶È¸ø¶¨ Õý·´×ª¸ø¶¨
+  94   1      //-----------------------------------------------------
+  95   1      //ON/OFF ²âÊÔÄ£Ê½
+  96   1      #if(0)
+                if((Ctl.Tim.OnOffnms > 10)&&(Ctl.Tim.OnOffnms < 500))   
+                {
+                  Uc.flg.START = FALSE;
+                }
+                else if (Ctl.Tim.OnOffnms < 1200)
+                {
+                  //Ctl.Tim.OnOffnms = 1000;
+                  Uc.flg.START = TRUE;  
+                }     
+                else
+                {
+                  Ctl.Tim.OnOffnms = 0; //15001
+                }
+                #endif
+ 111   1      //=====================================================
+ 112   1      //---------------------------------------------------
+ 113   1      //Õý·´×ª£¬µµÎ»ÃüÁî¸ø¶¨
+ 114   1      ////Xn°´¼üÃüÁî¸ø¶¨  -> ÃüÁîÖ´ÐÐ Çá´¥ÐÍ¿ª·¢
+C51 COMPILER V9.52.0.0   MC_USERINTERFACE_LAYER                                            08/07/2017 14:18:18 PAGE 3   
+
+ 115   1      #if(0)
+                if(X1.Kflg == TRUE)
+                {
+                  X1.Kflg = FALSE;
+                  X1.KNum = FALSE;
+                  SpeedShift--;
+              
+                 if(Ctl.spd.SpeedShift < 1)
+                  {
+                    Ctl.spd.SpeedShift = 1;
+                  }
+                  WriteRomValue = (u8)Ctl.spd.SpeedShift;//µôµçµµÎ»´æ´¢
+                }
+              #endif
+ 129   1      //Xn¶Ë×ÓÃüÁî¸ø¶¨  -> ÃüÁîÖ´ÐÐ   ³£¿ª³£±ÕÐÍ
+ 130   1      #if(0)
+                if(X3.XCount == KEY_FILTERCOUNT)
+                { 
+                  Uc.flg.FR = CCW;
+                }
+                else if(X3.XCount == -KEY_FILTERCOUNT)
+                {
+                  Uc.flg.FR = CW;
+                }
+              #endif
+ 140   1      //Xn°´¼üÃüÁî¸ø¶¨  -> ÃüÁîÖ´ÐÐ Çá´¥ÐÍ¿ª·¢
+ 141   1      #if(0)
+                if(X3.Kflg == TRUE)
+                {
+                  X3.Kflg = FALSE;
+                  X3.KNum = FALSE;
+                   
+                  if(Uc.flg.FR == CW)
+                  {
+                    Uc.flg.FR = CCW;
+                  }
+                  else if(Uc.flg.FR == CCW)
+                  {
+                    Uc.flg.FR = CW;
+                  }
+                }
+              #endif
+ 157   1      //---------------------------------------------------
+ 158   1      //Æô¶¯ÃüÁî¸ø¶¨ ADCÆô¶¯¡¢°´¼üÆô¶¯¡¢¶Ë×ÓÆô¶¯
+ 159   1      //Xn°´¼üÃüÁî¸ø¶¨  -> ÃüÁîÖ´ÐÐ Çá´¥ÐÍ¿ª·¢
+ 160   1      #if (KEYONOFF_EN == 1) 
+                if(X2.Kflg == TRUE)
+                {
+                  X2.Kflg = FALSE;
+                  X2.KNum = FALSE;
+                  
+                  if(Uc.flg.START == TRUE)
+                  {
+                    Uc.flg.START = FALSE;
+                  }
+                  else
+                  {
+                    Uc.flg.START = TRUE;
+                  }      
+                }
+              #elif (KEYONOFF_EN == 2)
+                if(X0.XCount == KEY_FILTERCOUNT)
+C51 COMPILER V9.52.0.0   MC_USERINTERFACE_LAYER                                            08/07/2017 14:18:18 PAGE 4   
+
+                { 
+                  Uc.flg.START = FALSE;
+                }
+                else if(X0.XCount == -KEY_FILTERCOUNT)
+                {
+                  Uc.flg.START = TRUE;
+                }
+              #elif(ADCONOFF_EN)
+                //µçÎ»¼Æ¿ª¹Ø
+                if(Drv.AdcMeas.Sref > ADCREFONVALUE)
+                {
+                  Ctl.spd.SwitchCount++;
+                }
+                //else if((Drv.AdcMeas.Sref < _IQ(0.02))&&(Drv.PWM.DutyCurrent < _IQ(0.02)))
+                else if(Drv.AdcMeas.Sref < ADCREFOFFVALUE)
+                {
+                  Ctl.spd.SwitchCount--;
+                }
+                if(Ctl.spd.SwitchCount > SREFCOUNT)
+                {
+                  Ctl.spd.SwitchCount = SREFCOUNT;
+                  Uc.flg.START = TRUE;
+                }
+                else if(Ctl.spd.SwitchCount < -SREFCOUNT) 
+                {
+                  Ctl.spd.SwitchCount = -SREFCOUNT;
+                  Uc.flg.START = FALSE;
+              
+              //    Ctl.SysError = NONE;  //Çå³ý¹ÊÕÏ
+              //    Ctl.State = MOTOR_READY; 
+              //    DRV_OE_ON;
+                }  
+              #endif
+ 210   1        //Ctl.Is.refTar = Drv.AdcMeas.Sref>>2;   //µçÁ÷»·¸ø¶
+ 211   1      
+ 212   1      #if(PWMINSREF_EN) //PWMIN µ÷ËÙ
+ 213   1        MDUControl.FlagTargetSpeed = 0x7F ;      //ËÙ¶È¸ø¶¨¼ÆËãÇëÇó          
+ 214   1        
+ 215   1        Ctl.spd.refTar = MDUControl.TargetSpeed;
+ 216   1        Drv.PWM.DutytargetOpen = MDUControl.TargetSpeed;
+ 217   1      #elif(ADCSREF_EN) //ADC µ÷ËÙ
+                MDUControl.FlagTargetSpeed = 0x7F ;     //ËÙ¶È¸ø¶¨¼ÆËãÇëÇó 
+                MDUControl.SpeedSref = Drv.AdcMeas.Sref;
+              
+                Ctl.spd.refTar = MDUControl.TargetSpeed;
+                Drv.PWM.DutytargetOpen = MDUControl.TargetSpeed;
+              #endif
+ 224   1      
+ 225   1      //-----------------------------------------
+ 226   1      //ÃüÁîÖ´ÐÐ
+ 227   1        if((Uc.flg.START == TRUE)&&(Uc.flg.FR != NONE))  
+ 228   1        {
+ 229   2          Ctl.Start = TRUE;
+ 230   2        } 
+ 231   1        else if(Uc.flg.START == FALSE)
+ 232   1        {                   
+ 233   2          if(Ctl.FnStopmodeC == FREE_DOWN)
+ 234   2          {
+ 235   3            Ctl.Start = FALSE;
+ 236   3            PWMINCtl.PWMINIdle = TRUE;
+ 237   3          }
+ 238   2          else if(Ctl.FnStopmodeC == SLOWING_DOWN)
+C51 COMPILER V9.52.0.0   MC_USERINTERFACE_LAYER                                            08/07/2017 14:18:18 PAGE 5   
+
+ 239   2          {
+ 240   3            Ctl.spd.refTar = 0;
+ 241   3            Drv.PWM.DutytargetOpen = 0;
+ 242   3            if(Ctl.State == MOTOR_NORMAL)
+ 243   3            {
+ 244   4              #if(SPEED_CLOSE_EN)
+                      if(((Ctl.spd.refCur<_IQ(0.05))))
+                      {
+                        Ctl.Start = FALSE;
+                        PWMINCtl.PWMINIdle = TRUE;
+                      }      
+                      #else
+ 251   4              if((Drv.PWM.DutyCurrent < _IQ(0.05)))
+ 252   4              {
+ 253   5                Ctl.Start = FALSE;
+ 254   5                PWMINCtl.PWMINIdle = TRUE;
+ 255   5              }      
+ 256   4              #endif
+ 257   4            }
+ 258   3            else
+ 259   3            {
+ 260   4              Ctl.Start = FALSE;
+ 261   4              PWMINCtl.PWMINIdle = TRUE;
+ 262   4            }
+ 263   3          } 
+ 264   2          else if(Ctl.FnStopmodeC == BREAK_DOWN)
+ 265   2          {
+ 266   3            Ctl.Start = FALSE;
+ 267   3            PWMINCtl.PWMINIdle = TRUE;
+ 268   3          }      
+ 269   2        }
+ 270   1      
+ 271   1        if(Ctl.State == MOTOR_NORMAL)
+ 272   1        {
+ 273   2          Drv.PWM.Dutytarget = Drv.PWM.DutytargetOpen;
+ 274   2        }
+ 275   1        
+ 276   1      //=====================================================
+ 277   1      //ÎÞHALL Êä³öÏÞ·ù ±È½ÏÆ÷´¥·¢Ä£Ê½
+ 278   1      #if (POSITION_FB_MODE == SENSORLESS)  
+ 279   1      //    if(Drv.PWM.DutytargetOpen < Ctl.Ramp.cpDutyEnd)
+ 280   1      //    {
+ 281   1      //      Drv.PWM.DutytargetOpen = Ctl.Ramp.cpDutyEnd ;
+ 282   1      //    }
+ 283   1        #if (CMPSAME_EN == 1) 
+                  SetBit(CMP_CR2, CMPSAME, 1);
+                #elif (CMPSAME_EN == 2)
+ 286   1          if(Drv.PWM.DutyCurrent > CMPSAMESWITCH)         //CMPSAMESWITCH
+ 287   1          {
+ 288   2            SetBit(CMP_CR2, CMPSAME, 0);
+ 289   2          }
+ 290   1          else
+ 291   1          {
+ 292   2            SetBit(CMP_CR2, CMPSAME, 1);
+ 293   2          }
+ 294   1        #endif
+ 295   1      
+ 296   1      #endif
+ 297   1      }
+ 298          
+ 299          
+
+C51 COMPILER V9.52.0.0   MC_USERINTERFACE_LAYER                                            08/07/2017 14:18:18 PAGE 6   
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    206    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      1    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

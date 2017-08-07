@@ -1,0 +1,315 @@
+C51 COMPILER V9.52.0.0   FU68XX_MCADC                                                      08/07/2017 14:18:20 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE FU68XX_MCADC
+OBJECT MODULE PLACED IN .\obj\fu68xx_MCadc.obj
+COMPILER INVOKED BY: C:\Keil_v4\C51\BIN\C51.EXE User\Source\fu68xx_MCadc.c LARGE OMF2 WARNINGLEVEL(0) OPTIMIZE(SIZE) BRO
+                    -WSE NOAREGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\fu68xx_MCadc.lst) TABS(2) OBJECT(.\obj\fu68xx_MCa
+                    -dc.obj)
+
+line level    source
+
+   1          
+   2          /************************ (C) COPYRIGHT 2015 FT *******************************
+   3          * File Name          : 
+   4          * Author             : Application Team  Tom.wang 
+   5          * Version            : V2.0.0
+   6          * Date               : 06/15/2015
+   7          * Description        : 
+   8          ********************************************************************************
+   9          /*******************************************************************************
+  10          * All Rights Reserved
+  11          *******************************************************************************/
+  12          
+  13          /* Includes ------------------------------------------------------------------*/
+  14          #include <FU68xx.h>
+  15          #include "sys_conf.h"
+  16          #include "fu68xx_MCadc.h"
+  17          #include "fu68xx_MClpf.h"
+  18          #include "MC_MotorDriver_layer.h"    
+  19          #include "MC_MotorCotrol_layer.h"    
+  20          /* Private typedef -----------------------------------------------------------*/
+  21          /* Private define ------------------------------------------------------------*/
+  22          /* Private macro -------------------------------------------------------------*/
+  23          /* Private variables ---------------------------------------------------------*/
+  24          /* Private function prototypes -----------------------------------------------*/
+  25          /* Private functions ---------------------------------------------------------*/
+  26          extern u8 Delay(u16 timer);
+  27          extern u8 Delayus(u16 timer);
+  28          
+  29          void ADCGetFastValue(void);
+  30          /*******************************************************************************
+  31          * Function Name  : main
+  32          * Description    : Main program.
+  33          * Input          : None
+  34          * Output         : None
+  35          * Return         : None
+  36          *******************************************************************************/
+  37          void ADC_Config(void)
+  38          {
+  39   1        /*-------------------------------------------------------------------------------------------------
+  40   1        ADC基本配置
+  41   1        1、使能ADC
+  42   1        4、设置数据格式为12bit
+  43   1        5、禁止ADC Trigger
+  44   1        -------------------------------------------------------------------------------------------------*/
+  45   1        SetBit(ADC_STA, ADCEN, 1);                               // 使能ADC
+  46   1        SetBit(ADC_STA, ADCBS, 0);                               // 12bit数据格式，0为12，1为10位
+  47   1        SetBit(ADC_CFG, ADTRIGEN, 1);                            // 禁止ADC Trigger
+  48   1        TIM2_ADTR = 1;  /*-----------------------------------------------------------------------------------
+  49   1        ADC参考电压选择
+  50   1        ADCREF = 00：选择VDD5作为ADC参考电压
+  51   1        ADCREF = 01：选择外部VREF作为ADC参考电压
+  52   1        ADCREF = 10：选择内部VREF作为ADC参考电压
+  53   1        ADCREF = 11：选择内部VREF作为ADC参考电压，同时参考电压输出到VREF管脚
+C51 COMPILER V9.52.0.0   FU68XX_MCADC                                                      08/07/2017 14:18:20 PAGE 2   
+
+  54   1        -----------------------------------------------------------------------------------*/
+  55   1        SetBit(ADC_CFG, ADCREF1, 1);
+  56   1        SetBit(ADC_CFG, ADCREF0, 1);
+  57   1      
+  58   1        /*-----------------------------------------------------------------------------------
+  59   1        ADC通道配置
+  60   1        1、使能相应Pin为模拟Pin，禁止数字功能
+  61   1        2、使能通道MASK，连接Pin到ADC模块
+  62   1        -----------------------------------------------------------------------------------*/
+  63   1        SetBit(P3_AN, P34, 1);
+  64   1        SetBit(ADC_MASK, CH7EN, 1);     //Config P3.4 as ADC7
+  65   1      
+  66   1      //  SetBit(P3_AN, P33, 1); 
+  67   1      //  SetBit(ADC_MASK, CH6EN, 1);      //Config P3.3 as ADC6
+  68   1      
+  69   1        //SetBit(P3_AN, P32, 1);
+  70   1        //SetBit(ADC_MASK, CH5EN, 1);    //Config P3.2 as ADC5
+  71   1      
+  72   1        SetBit(P2_AN, P27, 1);
+  73   1        SetBit(ADC_MASK, CH4EN, 1);      //Config P2.7 as ADC4
+  74   1      
+  75   1        SetBit(P2_AN, P25, 1);
+  76   1        SetBit(ADC_MASK, CH3EN, 1);      //Config P2.5 as ADC3
+  77   1        
+  78   1        SetBit(P2_AN, P24, 1); 
+  79   1        SetBit(ADC_MASK, CH2EN, 1);      //Config P2.4 as ADC2
+  80   1      
+  81   1        SetBit(P2_AN, P23, 1);
+  82   1        SetBit(ADC_MASK, CH1EN, 1);      //Config P2.3 as ADC1
+  83   1      
+  84   1        SetBit(P2_AN, P20, 1);
+  85   1        SetBit(ADC_MASK, CH0EN, 1);    //Config P2.0 as ADC0
+  86   1      
+  87   1        /*ADC通道采样时钟周期设置*/
+  88   1        ADC_SCYC1 = 0x33;                // 3个ADC Clock
+  89   1        ADC_SCYC0 = 0x33;                // 3个ADC Clock
+  90   1      
+  91   1      /*-------------------------------------------------------------------------------------------------
+  92   1        ADC中断设置
+  93   1        1、使能ADC中断
+  94   1        2、禁止ADC Trigger中断
+  95   1        3、设置ADC中断优先级别为0
+  96   1      -------------------------------------------------------------------------------------------------*/
+  97   1        CLR(ADC_STA, ADCIF);
+  98   1        SetBit(ADC_STA, ADCIE, 1);       // 0，禁止ADC中断，1，使能ADC中断
+  99   1      
+ 100   1        CLR(ADC_CFG, ADTRIGIF);
+ 101   1        SetBit(ADC_CFG, ADTRIGIE, 0);    // 0，禁止ADC Trigger中断，1，使能ADC Trigger中断
+ 102   1        
+ 103   1      }
+ 104          
+ 105          /*******************************************************************************
+ 106          * Function Name  : ADCInit
+ 107          * Description    : ADC初始化
+ 108          * Input          : None
+ 109          * Output         : None
+ 110          * Return         : None      
+ 111          *******************************************************************************/
+ 112          void ADCInit(void)
+ 113          {
+ 114   1        // V_bus
+ 115   1        //Drv.AdcMeas.VdcMeasOffset = 0;
+C51 COMPILER V9.52.0.0   FU68XX_MCADC                                                      08/07/2017 14:18:20 PAGE 3   
+
+ 116   1        Drv.AdcMeas.VdcMeasGain = VDCMEASEGAIN;
+ 117   1        Drv.AdcMeas.VdcMeas = 0;
+ 118   1        Drv.AdcMeas.Vdc = 0;
+ 119   1      
+ 120   1        if(Drv.AdcMeas.ImeasA < 0x100)
+ 121   1        {
+ 122   2          Drv.AdcMeas.ImeasAOffset = -Drv.AdcMeas.ImeasA;
+ 123   2        }
+ 124   1        if(Drv.AdcMeas.ImeasB < 0x100)
+ 125   1        {
+ 126   2          Drv.AdcMeas.ImeasBOffset = -Drv.AdcMeas.ImeasB;
+ 127   2        }
+ 128   1        if(Drv.AdcMeas.ImeasC < 0x100)
+ 129   1        {
+ 130   2          Drv.AdcMeas.ImeasCOffset = -Drv.AdcMeas.ImeasC;
+ 131   2        }
+ 132   1        // I_bus                   
+ 133   1        if(Drv.AdcMeas.ImeasBus < 0x100)
+ 134   1        {
+ 135   2          Drv.AdcMeas.IBusMeasOffset = -Drv.AdcMeas.ImeasBus;
+ 136   2        }
+ 137   1        else if((Drv.AdcMeas.ImeasBus < 0x3FFF+0x500)&&(Drv.AdcMeas.ImeasBus > 0x3FFF-0x500))
+ 138   1        {
+ 139   2          Drv.AdcMeas.IBusMeasOffset = -Drv.AdcMeas.ImeasBus;
+ 140   2        }    
+ 141   1        Drv.AdcMeas.IBusMeasGain = IBUSMEASGAIN;
+ 142   1        Drv.AdcMeas.ImeasBus = 0;
+ 143   1        Drv.AdcMeas.Ibus = 0;  
+ 144   1        // VTH1
+ 145   1        Drv.AdcMeas.Vth1Meas     = 0;
+ 146   1        Drv.AdcMeas.Vth1         = 0;
+ 147   1        Drv.AdcMeas.Therm1       = 0;
+ 148   1        // VTH2
+ 149   1        Drv.AdcMeas.Vth2Meas     = 0;
+ 150   1        Drv.AdcMeas.Vth2         = 0;
+ 151   1        Drv.AdcMeas.Therm2       = 0;
+ 152   1        // VTH3
+ 153   1        Drv.AdcMeas.Vth3Meas     = 0;
+ 154   1        Drv.AdcMeas.Vth3         = 0;
+ 155   1        Drv.AdcMeas.Therm3       = 0;
+ 156   1        // Vref
+ 157   1        Drv.AdcMeas.SrefMeas     = 0;
+ 158   1        Drv.AdcMeas.Sref         = 0;
+ 159   1      }
+ 160          
+ 161          
+ 162          /*******************************************************************************
+ 163          * Function Name  : FastADConvert    
+ 164          * Description    : ADC快速检测
+ 165          * Input          : None
+ 166          * Output         : None
+ 167          * Return         : None
+ 168          *******************************************************************************/
+ 169          void FastADConvert(void)
+ 170          {
+ 171   1        u8 tempADC_MASK;
+ 172   1        #if(MOS_SELFINSPECTION)
+                tempADC_MASK = ADC_MASK;
+              
+                ADC_MASK = 0x07;
+              
+                CLR(ADC_STA, ADCIF);
+C51 COMPILER V9.52.0.0   FU68XX_MCADC                                                      08/07/2017 14:18:20 PAGE 4   
+
+                Delay(2);
+                SetBit(ADC_STA, ADCBSY, 1);         //启动ADC采样转换
+                while(!(GetBit(ADC_STA, ADCIF)));   //ADC软件触发中断服务函数
+                {
+                  CLR(ADC_STA, ADCIF);
+                  ADC_MASK = tempADC_MASK;
+                }
+                #endif
+ 186   1      }
+ 187          
+ 188          
+ 189          void ADCGetFastValue(void)
+ 190          {
+ 191   1        u16 DataMeasValue,tImeasBus,tVmeasA,tVmeasB,tVmeasC;              //ADC采集值
+ 192   1        
+ 193   1        tVmeasA = ADC2_DR << 3; 
+ 194   1        tVmeasB = ADC0_DR << 3; 
+ 195   1        tVmeasC = ADC1_DR << 3;
+ 196   1      
+ 197   1        if(Ctl.State <= MOTOR_INIT) 
+ 198   1        {
+ 199   2          Drv.AdcMeas.VmeasA = tVmeasA; 
+ 200   2          Drv.AdcMeas.VmeasB = tVmeasB; 
+ 201   2          Drv.AdcMeas.VmeasC = tVmeasC; 
+ 202   2        }    
+ 203   1        else
+ 204   1        {
+ 205   2          Drv.AdcMeas.VmeasA = tVmeasA + Drv.AdcMeas.ImeasAOffset;
+ 206   2          Drv.AdcMeas.VmeasB = tVmeasB + Drv.AdcMeas.ImeasBOffset;
+ 207   2          Drv.AdcMeas.VmeasC = tVmeasC + Drv.AdcMeas.ImeasCOffset;
+ 208   2          if(Drv.AdcMeas.VmeasA < 0) Drv.AdcMeas.VmeasA = 0;
+ 209   2          if(Drv.AdcMeas.VmeasB < 0) Drv.AdcMeas.VmeasB = 0;
+ 210   2          if(Drv.AdcMeas.VmeasC < 0) Drv.AdcMeas.VmeasC = 0;
+ 211   2        }
+ 212   1      }
+ 213          /*******************************************************************************
+ 214          * Function Name  : ADCGetValue
+ 215          * Description    : 
+ 216          * Input          : None
+ 217          * Output         : None
+ 218          * Return         : None      
+ 219          *******************************************************************************/
+ 220          void ADCGetValue(void)
+ 221          {
+ 222   1        u16 DataMeasValue,tImeasBus;   //ADC采集值
+ 223   1        
+ 224   1        DataMeasValue = ADC2_DR << 3;  // Q12-->Q15
+ 225   1        Drv.AdcMeas.VdcMeas  = MC_LPF(DataMeasValue,Drv.AdcMeas.VdcMeas, 10000); //运行时间25us
+ 226   1      
+ 227   1        tImeasBus = ADC4_DR << 3;      // Q12-->Q15  
+ 228   1        if(Ctl.State <= MOTOR_INIT) 
+ 229   1        {
+ 230   2          Drv.AdcMeas.ImeasBus = MC_LPF(tImeasBus,Drv.AdcMeas.ImeasBus, 10000); //运行时间25us
+ 231   2        }    
+ 232   1        else
+ 233   1        {
+ 234   2          Drv.AdcMeas.ImeasBus = tImeasBus + Drv.AdcMeas.IBusMeasOffset;
+ 235   2          if(Drv.AdcMeas.ImeasBus < 0)
+ 236   2          {
+ 237   3            Drv.AdcMeas.ImeasBus = 0;
+ 238   3          }
+ 239   2        }
+C51 COMPILER V9.52.0.0   FU68XX_MCADC                                                      08/07/2017 14:18:20 PAGE 5   
+
+ 240   1       
+ 241   1        //Drv.AdcMeas.Vth1Meas = ADC1_DR << 3; // Q12-->Q15 
+ 242   1        Drv.AdcMeas.Vth2Meas = ADC3_DR << 3; // Q12-->Q15
+ 243   1        Drv.AdcMeas.Vth3Meas = ADC6_DR << 3; // Q12-->Q15
+ 244   1        Drv.AdcMeas.SrefMeas = ADC7_DR << 3; // Q12-->Q15
+ 245   1      }
+ 246          
+ 247          /*******************************************************************************
+ 248          * Function Name  : ADCGetConversionValue
+ 249          * Description    : 
+ 250          * Input          : None
+ 251          * Output         : None
+ 252          * Return         : None      
+ 253          *******************************************************************************/
+ 254          void ADCGetConversionValue(void)
+ 255          {
+ 256   1        u16 DataMeasValue = 0;
+ 257   1        float fValue = 0;
+ 258   1        #if(VBUS_CALC_EN)
+ 259   1        Drv.AdcMeas.Vdc = Drv.AdcMeas.VdcMeas*Drv.AdcMeas.VdcMeasGain;
+ 260   1        #endif
+ 261   1        #if(IBUS_CALC_EN)
+                Drv.AdcMeas.Ibus = Drv.AdcMeas.ImeasBus*Drv.AdcMeas.IBusMeasGain;
+                #endif
+ 264   1      //  Drv.AdcMeas.Vth1 = Drv.AdcMeas.Vth1Meas;
+ 265   1      //  Drv.AdcMeas.Vth2 = Drv.AdcMeas.Vth2Meas;
+ 266   1      //  Drv.AdcMeas.Sref = Drv.AdcMeas.SrefMeas;
+ 267   1        #if(OH1_EN)  Drv.AdcMeas.Vth1 = MC_LPF(Drv.AdcMeas.Vth1Meas,Drv.AdcMeas.Vth1, 1000); 
+                #endif
+ 269   1        #if(OH2_EN)
+                Drv.AdcMeas.Vth2 = MC_LPF(Drv.AdcMeas.Vth2Meas,Drv.AdcMeas.Vth2, 1000);
+                #endif
+ 272   1        #if(ADCSREF_EN)
+                Drv.AdcMeas.Sref = MC_LPF(Drv.AdcMeas.SrefMeas,Drv.AdcMeas.Sref, 1000);
+                #endif
+ 275   1      }
+ 276          
+ 277          
+ 278          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    915    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----      15
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,252 @@
+C51 COMPILER V9.52.0.0   MC_LED                                                            08/07/2017 14:18:19 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE MC_LED
+OBJECT MODULE PLACED IN .\obj\MC_Led.obj
+COMPILER INVOKED BY: C:\Keil_v4\C51\BIN\C51.EXE User\Source\MC_Led.c LARGE OMF2 WARNINGLEVEL(0) OPTIMIZE(SIZE) BROWSE NO
+                    -AREGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\MC_Led.lst) TABS(2) OBJECT(.\obj\MC_Led.obj)
+
+line level    source
+
+   1          /* Includes ------------------------------------------------------------------*/
+   2          #include <FU68xx.h>
+   3          #include <Myproject.h>
+   4          
+   5          
+   6          /** @addtogroup FT68xx
+   7            * @{
+   8            */
+   9          
+  10          /* Private typedef -----------------------------------------------------------*/
+  11          /* Private define ------------------------------------------------------------*/
+  12          #define LEDFAULTDIS_EN     (1)     //故障指示
+  13          #define LEDONOFFDIS_EN     (0)     //ONOFF指示#define LEDCWCCWDIS_EN     (0)     //正反转显示
+  14          #define LEDCELLDIS_EN      (0)     //电量显示
+  15          #define LEDSHIFTDIS_EN     (0)     //档位显示
+  16          
+  17          /* Private macro -------------------------------------------------------------*/
+  18          /* Private variables ---------------------------------------------------------*/
+  19          /* Private function prototypes -----------------------------------------------*/
+  20          
+  21          
+  22          void LED_show(void);
+  23          void Fault_Led(Error_TypeDef value); 
+  24          /* Private functions ---------------------------------------------------------*/
+  25          
+  26          /*******************************************************************************
+  27          * Function Name  : Fault_Led   P15 P17 P20
+  28          * Description    : 
+  29          * Input          : Ctl.SysError故障代码
+  30          * Output         : None
+  31          * Return         : None
+  32          *******************************************************************************/
+  33          void Fault_Led(Error_TypeDef value)
+  34          {
+  35   1        #if(LEDFAULTDIS_EN)
+  36   1        u16 temp = 500;
+  37   1        if(value != 0)
+  38   1        {
+  39   2          if(Ctl.Tim.LED_OnOffms > temp)
+  40   2          {
+  41   3            if(Ctl.Tim.LED_Cunter <= ((value<<1) - 1))  //一元操作符不加空格 3.6.6
+  42   3            {
+  43   4              if(Ctl.Tim.LED_OnOffms > (temp + 500))
+  44   4              {
+  45   5                Ctl.Tim.LED_OnOffms = temp;
+  46   5                Ctl.Tim.LED_Cunter++;
+  47   5                FAULT_ONOFF;
+  48   5              }       
+  49   4            }
+  50   3            else
+  51   3            {
+  52   4              #if(0)
+                      //FAULT_ONOFF;                     //故障指示完成，输出固定信号
+                      Ctl.Tim.LED_OnOffms = 0;
+C51 COMPILER V9.52.0.0   MC_LED                                                            08/07/2017 14:18:19 PAGE 2   
+
+                      #else                              //故障指示完成，输出斩波信号
+  56   4              if(Ctl.Tim.LED_OnOffms>temp+100)
+  57   4              {
+  58   5                Ctl.Tim.LED_OnOffms  = temp;
+  59   5                FAULT_ONOFF;
+  60   5              } 
+  61   4              #endif                   
+  62   4            }             
+  63   3          }
+  64   2        }
+  65   1        else
+  66   1        {
+  67   2          Ctl.Tim.LED_OnOffms = 0;
+  68   2        }
+  69   1        #endif
+  70   1      }
+  71          
+  72          /*******************************************************************************
+  73          * Function Name  : LED_show
+  74          * Description    : 
+  75          * Input          : 
+  76          * Output         : None
+  77          * Return         : None
+  78          *******************************************************************************/
+  79          void LED_show(void)
+  80          {
+  81   1        //照明指示
+  82   1        #if(LAMP_EN) //扳手螺丝批，延时掉电程序
+                if(Ctl.Tim.NoOperationDelaynms >= NOOPDELAYNMS)
+                {
+                  Ctl.Tim.NoOperationDelaynms = NOOPDELAYNMS;
+              //    ReadRomValue = Flash_GetAddress();     //读
+              //    Flash_ErasePageRom();                  //擦
+              //    Flash_KeyWriteValue((WriteRomValue));  //写
+                  PDELAY_OFF;
+                } 
+                else
+                {
+                  PDELAY_ON;
+                }
+                #endif   
+  96   1                                
+  97   1        #if(LEDONOFFDIS_EN)
+                if(Ctl.Start == TRUE)
+                {
+                  LED1_ON;
+                }
+                else
+                {
+                  LED1_OFF;
+                }
+                #endif
+ 107   1      //正反转显示
+ 108   1        #if(LEDCWCCWDIS_EN)
+                if(Uc.flg.FR == CW)
+                {
+                  LED2_OFF;
+                }
+                else if(Uc.flg.FR == CCW)
+                {
+                  LED2_ON;
+                }
+C51 COMPILER V9.52.0.0   MC_LED                                                            08/07/2017 14:18:19 PAGE 3   
+
+                #endif
+ 118   1      //电量显示
+ 119   1        #if(LEDCELLDIS_EN)
+                if (Ctl.SysError == NONE)
+                {
+                  if(Drv.AdcMeas.Vdc > 18)
+                  {
+                    LED1_ON;
+                    LED2_ON;
+                    LED3_ON;
+                  }
+                  else if(Drv.AdcMeas.Vdc > 16.5)
+                  {
+                    LED1_OFF;
+                    LED2_ON;
+                    LED3_ON;
+                  }
+                  else if(Drv.AdcMeas.Vdc > 15)
+                  {
+                    LED1_OFF;
+                    LED2_OFF;
+                    LED3_ON;
+                  }
+                  else
+                  {
+                    LED1_OFF;
+                    LED2_OFF;
+                    LED3_OFF;
+                  }
+                }
+                #endif 
+ 148   1      //档位显示
+ 149   1      
+ 150   1        #if(LEDSHIFTDIS_EN)
+                switch(Ctl.spd.SpeedShift)
+                {
+                  case 1:
+                  {
+                    LED4_ON;
+                    LED5_OFF;
+                    LED6_OFF;
+                    LED7_OFF;
+                    LED8_OFF;
+                    LED9_OFF;
+                  }
+                    break;
+                  case 2:
+                  {
+                    LED4_ON;
+                    LED5_ON;
+                    LED6_OFF;
+                    LED7_OFF;
+                    LED8_OFF;
+                    LED9_OFF;
+                  }
+                    break;
+                  case 3:
+                  {
+                    LED4_ON;
+                    LED5_ON;
+                    LED6_ON;
+                    LED7_OFF;
+C51 COMPILER V9.52.0.0   MC_LED                                                            08/07/2017 14:18:19 PAGE 4   
+
+                    LED8_OFF;
+                    LED9_OFF;
+                  }      
+                    break;
+                  case 4:
+                  {
+                    LED4_ON;
+                    LED5_ON;
+                    LED6_ON;
+                    LED7_ON;
+                    LED8_OFF;
+                    LED9_OFF;
+                  }
+                    break;
+                  case 5:
+                  {
+                    LED4_ON;
+                    LED5_ON;
+                    LED6_ON;
+                    LED7_ON;
+                    LED8_ON;
+                    LED9_OFF;
+                  }
+                    break;  
+                  case 6:
+                  {
+                    LED4_ON;
+                    LED5_ON;
+                    LED6_ON;
+                    LED7_ON;
+                    LED8_ON;
+                    LED9_ON;
+                  }
+                  break;
+                  
+                  default:
+                    break;
+                }
+                #endif
+ 218   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    108    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

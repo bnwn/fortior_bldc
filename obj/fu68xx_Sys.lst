@@ -1,0 +1,145 @@
+C51 COMPILER V9.52.0.0   FU68XX_SYS                                                        08/07/2017 14:18:19 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE FU68XX_SYS
+OBJECT MODULE PLACED IN .\obj\fu68xx_Sys.obj
+COMPILER INVOKED BY: C:\Keil_v4\C51\BIN\C51.EXE User\Source\fu68xx_Sys.c LARGE OMF2 WARNINGLEVEL(0) OPTIMIZE(SIZE) BROWS
+                    -E NOAREGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\fu68xx_Sys.lst) TABS(2) OBJECT(.\obj\fu68xx_Sys.obj
+                    -)
+
+line level    source
+
+   1          
+   2          #include <FU68xx.h>
+   3          #include "sys_conf.h"
+   4          
+   5          void fu68xx_xram_erase(void);
+   6          void Driver_Init(void);
+   7          void SystemInit(void);
+   8          
+   9          void SystemInit(void)
+  10          {
+  11   1      //-----------------------------------------
+  12   1      //Xram 清零
+  13   1        fu68xx_xram_erase();
+  14   1      
+  15   1      //-----------------------------------------
+  16   1      //驱动模式 
+  17   1        Driver_Init();
+  18   1      /*-----------------------------------------------------------------------------------
+  19   1        5、ADC参考电压配置
+  20   1        6、运放基准电压配置
+  21   1      -----------------------------------------------------------------------------------*/
+  22   1        VREFConfig(VREF5_0, Enable);                // ADC参考电压配置
+  23   1        VHALFConfig(VREF_Half, Enable);             // 运放基准电压配置
+  24   1        
+  25   1        /*---------------------------------------------------------------------------------
+  26   1        MOE Protect Config
+  27   1        1、硬件保护使能，触发硬件保护后硬件关闭驱动输出MOE=0，同时产生硬件保护中断
+  28   1        2、选择硬件保护触发信号源，
+  29   1        1：外部中断0  
+  30   1        0：比较器3中断。
+  31   1        3、硬件保护触发信号滤波配置。
+  32   1         00-4cpu clock    01-8cpu clock    10-16cpu clock    11-24cpu clock 
+  33   1         ----------------------------------------------------------------------------------*/
+  34   1        #if(HARD_OC_EN)
+                SetBit(EVT_FILT, MCLREN, 1);                // 使能硬件保护
+                #else
+  37   1        SetBit(EVT_FILT, MCLREN, 0);                // 失能硬件保护
+  38   1        #endif
+  39   1      
+  40   1        #if (EFAL == FO_CMP)
+  41   1        //比较器中配置
+  42   1        SetBit(EVT_FILT, EFSRC, 0);                 // 硬件保护触发信号为CMP3输出
+  43   1        #else (EFAL == FO_INT)
+                IT01 = 0;                                  //
+                IT00 = 1;                                  //下降沿触发
+                
+                EX0 = 0;                                   //终端使能
+              
+                SetBit(EVT_FILT, EFSRC, 1);                 // 硬件保护触发信号为int0输出
+                #endif
+  51   1        SetBit(EVT_FILT, EFEN, 1);                  // 使能硬件保护触发信号滤波
+  52   1        SetBit(EVT_FILT, EFDIV1, 0);
+  53   1        SetBit(EVT_FILT, EFDIV0, 0);                // 硬件触发信号滤波宽度为24cpuclock
+C51 COMPILER V9.52.0.0   FU68XX_SYS                                                        08/07/2017 14:18:19 PAGE 2   
+
+  54   1      }
+  55          
+  56          
+  57          /*******************************************************************************
+  58          * Function Name  : fu68xx_xram_erase
+  59          * Description    : xram 清零模块
+  60          * Input          : None
+  61          * Output         : None
+  62          * Return         : None
+  63          *******************************************************************************/
+  64          
+  65          void fu68xx_xram_erase(void)
+  66          {
+  67   1        unsigned char xdata *port  ;
+  68   1        
+  69   1        port = 0;
+  70   1        while(port<=0XFFF)
+  71   1        {
+  72   2          *port  = 0 ;
+  73   2          port++;
+  74   2        }
+  75   1      }
+  76          
+  77          /*******************************************************************************
+  78          * Function Name  : Driver_Init
+  79          * Description    : 
+  80          * Input          : None
+  81          * Output         : None
+  82          * Return         : None
+  83          *******************************************************************************/
+  84          void Driver_Init(void)
+  85          {
+  86   1        u32 PRDRVCnt;
+  87   1      
+  88   1        /*-------------------------------------------------------------------------------------------------
+  89   1        DRV_CTL：PWM来源选择    
+  90   1        OCS1 = 0, OCS1 = X: TIM0 PWM
+  91   1        OCS1 = 1, OCS1 = 0: TIM1 PWM
+  92   1        OCS1 = 1, OCS1 = 1: FOC 6 PWM
+  93   1        -------------------------------------------------------------------------------------------------*/
+  94   1        /*TIM1 6 PWM output*/
+  95   1        SetBit(DRV_CTL, OCS1, 0);                     // TIM1 6 PWM output
+  96   1        SetBit(DRV_CTL, OCS0, 1);
+  97   1      
+  98   1        SetBit(DRV_CTL, PRDRVEN, 1);                 //Predriver使能位   
+  99   1        for(PRDRVCnt=0;PRDRVCnt<24000;PRDRVCnt++);   //vina 
+ 100   1        
+ 101   1        SetBit(DRV_CTL, DRVOE, 1);                   // gata driver使能位
+ 102   1      
+ 103   1        /*-------------------------------------------------------------------------------------------------
+ 104   1        空闲电平设置
+ 105   1        -------------------------------------------------------------------------------------------------*/ 
+ 106   1        OISWL = 0;                      // OC5空闲电平设置
+ 107   1        OISWH = 0;                      // OC4空闲电平设置
+ 108   1        OISVL = 0;                      // OC3空闲电平设置
+ 109   1        OISVH = 0;                      // OC2空闲电平设置
+ 110   1        OISUL = 0;                      // OC1空闲电平设置
+ 111   1        OISUH = 0;                      // OC0空闲电平设置
+ 112   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+C51 COMPILER V9.52.0.0   FU68XX_SYS                                                        08/07/2017 14:18:19 PAGE 3   
+
+   CODE SIZE        =    149    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----       4
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

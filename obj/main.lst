@@ -1,0 +1,84 @@
+C51 COMPILER V9.52.0.0   MAIN                                                              08/07/2017 14:18:18 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\obj\main.obj
+COMPILER INVOKED BY: C:\Keil_v4\C51\BIN\C51.EXE User\Source\main.c LARGE OMF2 WARNINGLEVEL(0) OPTIMIZE(SIZE) BROWSE NOAR
+                    -EGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\main.lst) TABS(2) OBJECT(.\obj\main.obj)
+
+line level    source
+
+   1          
+   2          /************************ (C) COPYRIGHT 2015 FT *******************************
+   3          * File Name          : 
+   4          * Author             : Application Team  Tom.wang 
+   5          * Version            : V2.0.0
+   6          * Date               : 06/15/2015
+   7          * Description        : 
+   8          ********************************************************************************
+   9          /*******************************************************************************
+  10          * All Rights Reserved
+  11          *******************************************************************************/
+  12          
+  13          /* Includes ------------------------------------------------------------------*/
+  14          #include <FU68xx.h>
+  15          #include <Myproject.h>
+  16          
+  17          /** @addtogroup FT68xx
+  18            * @{
+  19            */
+  20          /* Private typedef -----------------------------------------------------------*/
+  21          /* Private define ------------------------------------------------------------*/
+  22          /* Private macro -------------------------------------------------------------*/
+  23          /* Private variables ---------------------------------------------------------*/
+  24          /* Private function prototypes -----------------------------------------------*/
+  25          /* Private functions ---------------------------------------------------------*/
+  26          /*******************************************************************************
+  27          * Function Name  : main
+  28          * Description    : Main program.
+  29          * Input          : None
+  30          * Output         : None
+  31          * Return         : None
+  32          *******************************************************************************/
+  33          
+  34          int main(void)
+  35          { 
+  36   1        /*System Init*/
+  37   1        SystemInit();
+  38   1      
+  39   1        /*Software Init*/
+  40   1        SoftwareInit();
+  41   1        
+  42   1        /*Module Init*/
+  43   1        MCL_ModuleInit();
+  44   1      
+  45   1        Ctl.State = MOTOR_INIT;
+  46   1        //ÆôÍ£¿ØÖÆ     ²ÎÊý: TRUE OR FALSE      
+  47   1        Uc.flg.START = FALSE; 
+  48   1      
+  49   1        while(1)
+  50   1        {
+  51   2          UI();
+  52   2          MCL_MotorC();
+  53   2        }
+  54   1      }
+C51 COMPILER V9.52.0.0   MAIN                                                              08/07/2017 14:18:18 PAGE 2   
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     30    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

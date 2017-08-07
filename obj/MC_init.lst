@@ -1,0 +1,531 @@
+C51 COMPILER V9.52.0.0   MC_INIT                                                           08/07/2017 14:18:18 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE MC_INIT
+OBJECT MODULE PLACED IN .\obj\MC_init.obj
+COMPILER INVOKED BY: C:\Keil_v4\C51\BIN\C51.EXE User\Source\MC_init.c LARGE OMF2 WARNINGLEVEL(0) OPTIMIZE(SIZE) BROWSE N
+                    -OAREGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\MC_init.lst) TABS(2) OBJECT(.\obj\MC_init.obj)
+
+line level    source
+
+   1          
+   2          /************************ (C) COPYRIGHT 2015 FT *******************************
+   3          * File Name          : 
+   4          * Author             : Application Team  Tom.wang 
+   5          * Version            : V2.0.0
+   6          * Date               : 06/15/2015
+   7          * Description        : 
+   8          ********************************************************************************
+   9          /*******************************************************************************
+  10          * All Rights Reserved
+  11          *******************************************************************************/
+  12          
+  13           /* Includes ------------------------------------------------------------------*/
+  14          #include <FU68xx.h>
+  15          #include <Myproject.h>
+  16          /* Private typedef -----------------------------------------------------------*/
+  17          /* Private define ------------------------------------------------------------*/
+  18          
+  19          /* Private macro -------------------------------------------------------------*/
+  20          /* Private variables ---------------------------------------------------------*/
+  21          //全关，UH->VL,UH->WL,VH->WL,VH->UL,WH->UL,WH->VL,刹车
+  22          uc16  DRV_SECTION2OCM[8] = {UVW_OFF,UH_VL,UH_WL,VH_WL,VH_UL,WH_UL,WH_VL,ULVLWL_ON}; 
+  23           
+  24          extern u8 xdata WriteRomValue;
+  25          extern u8 xdata ReadRomValue;
+  26          extern u8 xdata u8KeyForbid;  
+  27          extern DRV_TypeDef xdata Drv; 
+  28          /* Private function prototypes -----------------------------------------------*/
+  29          
+  30          void SoftwareInit(void);          //软件初始化
+  31          static void GPIO_Config(void);    //静态函数
+  32          static void Interrupt_Config(void);
+  33          void MCL_ModuleInstance(void);    //声明
+  34          void MCL_ModuleInit(void);        //初始化
+  35          void MCL_ModuleDefault(void);     //默认值
+  36          u8 Delay(u16 timer);
+  37          u8 Delayus(u16 timer);
+  38          
+  39          static void PWMinit(void);
+  40          static void Bemfinit(void);
+  41          static void Hallinit(void);
+  42          static void BemfDefault(void);
+  43          static void TimNmsDefault(void);
+  44          
+  45          /* Private functions ---------------------------------------------------------*/
+  46          
+  47          /*******************************************************************************
+  48          * Function Name  : ApplicationInit   Peripheral
+  49          * Description    :外设初始化
+  50          * Input          : None
+  51          * Output         : None
+  52          * Return         : None
+  53          *******************************************************************************/
+  54          void SoftwareInit(void)
+C51 COMPILER V9.52.0.0   MC_INIT                                                           08/07/2017 14:18:18 PAGE 2   
+
+  55          {  
+  56   1        // GPIO Configuration 
+  57   1        GPIO_Config(); 
+  58   1        // Time1 Configuration 
+  59   1        TIM1_Config();
+  60   1        // TIM2 Configuration 
+  61   1        TIM2_Config();
+  62   1        // TIM3 Configuration 
+  63   1        TIM3_Config();
+  64   1        // TIM4 Configuration 
+  65   1        TIM4_Config();
+  66   1        // TIM5 Configuration 
+  67   1        //TIM5_Config();  
+  68   1        // AD Configuration 
+  69   1        ADC_Config();
+  70   1        // CMP Configuration
+  71   1        CMP_Config();
+  72   1        // AMP Configuration
+  73   1        AMP_Config();
+  74   1        // SPI Configuration
+  75   1        //SPI_Config();
+  76   1        //KEY Configuration 
+  77   1        Key_Config();
+  78   1        //Hall Configuration
+  79   1        Hall_Init();
+  80   1      
+  81   1        //Pid Configuration
+  82   1        //Pid_Config();
+  83   1        MDUInit();
+  84   1        #if((PWMINSREF_EN)||(PWMINONOFF_EN))
+  85   1        PWMINInit();
+  86   1        #endif
+  87   1        //Pid Configuration
+  88   1        Interrupt_Config();  
+  89   1        //上电等待模块，等待电源稳定后启动
+  90   1        Ctl.Tim.u16PowerOnNms = 0;                //
+  91   1        Ctl.PowerOn == 0XFF;
+  92   1      
+  93   1        while(Ctl.Tim.u16PowerOnNms <= POWER_ON_NMS){}; 
+  94   1      
+  95   1        Ctl.PowerOn = 0x7F;//                              //上电完成
+  96   1        Ctl.SysError = NONE;   
+  97   1      }
+  98          
+  99          /*******************************************************************************
+ 100          * Function Name  : Interrupt_Config   
+ 101          * Description    : 中断优先级判断
+ 102          * Input          : None
+ 103          * Output         : None
+ 104          * Return         : None
+ 105          *******************************************************************************/
+ 106          void Interrupt_Config(void)
+ 107          {
+ 108   1        EA = 0;                                                  // 禁止全局中断
+ 109   1      
+ 110   1        /*EXTI中断配置*/
+ 111   1        PX01 = 1;                                                //优先级3
+ 112   1        PX00 = 1;
+ 113   1        
+ 114   1      //  PX11 = 1;
+ 115   1      //  PX10 = 0;                                              // 中断优先级别为2 
+ 116   1      
+C51 COMPILER V9.52.0.0   MC_INIT                                                           08/07/2017 14:18:18 PAGE 3   
+
+ 117   1        /*ADC中断配置*/
+ 118   1        PADC1 = 0;
+ 119   1        PADC0 = 0;                                               // 中断优先级别为0
+ 120   1      
+ 121   1        /*CMP中断配置*/
+ 122   1        PCMP1 = 0;
+ 123   1        PCMP0 = 0;                                               // 中断优先级别为3
+ 124   1      
+ 125   1        /*TIM1中断配置*/
+ 126   1        PTIM11 = 1;
+ 127   1        PTIM10 = 1;                                              // 中断优先级别为3
+ 128   1      
+ 129   1        /*TIM2/3中断配置*/
+ 130   1        PTIM231 = 0;
+ 131   1        PTIM230 = 1;                                            //将TIM2的中断优先级提高一级，提供保护和定时
+ 132   1        
+ 133   1        /*TIM4/5中断配置*/
+ 134   1        PTIM451 = 0;
+ 135   1        PTIM450 = 1;                                             // 中断优先级别为1
+ 136   1        
+ 137   1        EA = 1;                                                  // 使能全局中断
+ 138   1      }
+ 139          /*******************************************************************************
+ 140          * Function Name  : GPIO_Config
+ 141          * Description    : GPIO配置
+ 142          * Input          : None
+ 143          * Output         : None
+ 144          * Return         : None
+ 145          *******************************************************************************/
+ 146          void GPIO_Config(void)
+ 147          {    
+ 148   1        //-------------------------------------  
+ 149   1        //FD6536 使能 
+ 150   1        #if(DriverFD6536_EN)  
+                SetBit(FD6536_GPIO_PORT,FD6536_PIN,1); 
+                FD6536_DIS;
+                #endif
+ 154   1      
+ 155   1        #if (POSITION_FB_MODE == SENSORLESS)
+ 156   1        SetBit(NSS_GPIO_PORT,NSS_PIN,1); 
+ 157   1        SetBit(MOSI_GPIO_PORT,MOSI_PIN,1); 
+ 158   1        SetBit(MISO_GPIO_PORT,MISO_PIN,1);   
+ 159   1        SetBit(SCLK_GPIO_PORT,SCLK_PIN,1);  
+ 160   1        #endif  
+ 161   1        //------------------------------------  
+ 162   1        #if(LAMP_EN)
+                SetBit(PDELAY_GPIO_PORT,PDELAY_PIN,1); 
+                PDELAY_ON;
+                #endif
+ 166   1        
+ 167   1        //-------------------------------------  
+ 168   1        //FG
+ 169   1        SetBit(FG_GPIO_PORT,FG_PIN,1); 
+ 170   1        //-------------------------------------  
+ 171   1        //故障输出
+ 172   1        SetBit(FAULT_GPIO_PORT,FAULT_PIN,1);
+ 173   1        FAULT_ON;
+ 174   1        //LED显示设置       电量显示
+ 175   1        SetBit(LED1_GPIO_PORT,LED1_PIN,1); 
+ 176   1        SetBit(LED2_GPIO_PORT,LED2_PIN,1); 
+ 177   1      }
+ 178          
+C51 COMPILER V9.52.0.0   MC_INIT                                                           08/07/2017 14:18:18 PAGE 4   
+
+ 179          /*******************************************************************************
+ 180          * Function Name  : LED_show
+ 181          * Description    : 
+ 182          * Input          : 
+ 183          * Output         : None
+ 184          * Return         : None
+ 185          *******************************************************************************/
+ 186          void MCL_ModuleInit(void)
+ 187          {
+ 188   1        //----------------------------------
+ 189   1        Drv.PWM.PwmArr = PWMARR;
+ 190   1        Ctl.SysError = NONE; 
+ 191   1      
+ 192   1        //ReadRomValue = Flash_GetAddress();    //4.88ms 
+ 193   1        //WriteRomValue = ReadRomValue;  
+ 194   1      
+ 195   1        u8KeyForbid = 0X7F;
+ 196   1        PwmInResetFlag = 0x7F;
+ 197   1        //----------------------------------
+ 198   1        //控制参数初始化  
+ 199   1        Ctl.numTicksPerCtrl = PWM_PRESCALER;  Ctl.numTicksPerCtrl  = 1;
+ 200   1        Ctl.numTicksPerCurrent = 2;                   //2
+ 201   1        Ctl.numTicksPerSpeed = SPEED_CTL_CNT;         //6
+ 202   1        
+ 203   1        //----------------------------------
+ 204   1        // 电机运行方向设置 端子控制
+ 205   1        #if(BEMFSETFR)  //
+                Drv.Stk.BemfSetFR = (*(unsigned char code *)BemfSetFRRomAddress);
+              
+                if(Drv.Stk.BemfSetFR != 0)
+                {
+                  Uc.flg.FR = Drv.Stk.BemfSetFR&0x0F; 
+                }   
+                else
+                {
+                  Uc.flg.FR = DIRECTION ; 
+                }
+                #else
+ 217   1        Uc.flg.FR = DIRECTION ;  
+ 218   1        #endif
+ 219   1      
+ 220   1        Ctl.direction = Uc.flg.FR;    //方向控制
+ 221   1        Ctl.FnStopmodeC = STOPMODE;
+ 222   1        
+ 223   1        //----------------------------------
+ 224   1        //电机参数设置 
+ 225   1        Ctl.Motor.BaseSpeed    =  BASE_SPEED;
+ 226   1        Ctl.Motor.PolePairs    =  POLE_PAIR;
+ 227   1        Ctl.Motor.BaseVoltage  =  BASE_VOLTAGE;
+ 228   1        //----------------------------------
+ 229   1        // 母线电压增益  电流增益   BEMF增益
+ 230   1        ADCInit();
+ 231   1        //----------------------------------
+ 232   1        //PWM初始化
+ 233   1        PWMinit();
+ 234   1        //----------------------------------
+ 235   1        //速度闭环 加减速时间  
+ 236   1        #if(SPEED_CLOSE_EN)
+                Ctl.spd.refCur = 0;  
+                Ctl.spd.refTar = SPEED_REF_TAR;
+                Ctl.spd.IncValue = SPEED_INCVALUE;
+                Ctl.spd.DecValue = SPEED_DECVALUE;
+C51 COMPILER V9.52.0.0   MC_INIT                                                           08/07/2017 14:18:18 PAGE 5   
+
+                pid_spd.Kp = SPEED_PTERM; //Q15格式
+                pid_spd.Ki = SPEED_ITERM; //Q15格式
+                Pid_spdInit(); 
+                #endif
+ 245   1        //----------------------------------  
+ 246   1        #if(CURRENT_CLOSE_EN)
+                //电流环初始化
+                Ctl.Is.refCur = 0;  
+                Ctl.Is.refTar =   SPEED_REF_TAR;
+                pid_is.Kp = CURRENT_PTERM; //Q15格式
+                pid_is.Ki = CURRENT_ITERM; //Q15格式
+                Pid_isInit(); 
+                #endif
+ 254   1        //----------------------------------  
+ 255   1        #if(MOTORCIRCLECALEEN)     
+                Ctl.spd.ComNum  = 0;
+                Ctl.spd.CircleNum = 0;
+                #endif
+ 259   1        //----------------------------------
+ 260   1        //速度计算模块初始化
+ 261   1        Drv.speed.EventPeriod = 0;    
+ 262   1        Drv.speed.InputSelect = 1;
+ 263   1        Drv.speed.BaseRpm = Ctl.Motor.BaseSpeed; 
+ 264   1        Drv.speed.SpeedScaler = SPEEDSCALER ;
+ 265   1        
+ 266   1        //----------------------------------
+ 267   1        #if (POSITION_FB_MODE == SENSORLESS) 
+ 268   1        Bemfinit();
+ 269   1        #else  Hallinit();
+                #endif
+ 271   1        //==================================
+ 272   1        #if(OCRESTART_EN)
+ 273   1        Ctl.OC.u16Runms = 0;
+ 274   1        Ctl.OC.u16nmsCount = 0;
+ 275   1        Ctl.OC.u8ReNum = 0;
+ 276   1        #endif
+ 277   1        //----------------------------------
+ 278   1        #if(OVERLOAD_EN)
+                MCL_OverLoadInit(MECASEOVERLOAD0,MECASEOVERLOAD1,MECASEOVERLOAD2,MECASEOVERLOAD3,OL0NMS,OL1NMS,OL2NMS,OL
+             -3NMS);  
+                #endif
+ 281   1      }
+ 282          
+ 283          /*******************************************************************************
+ 284          * Function Name  : MCL_ModuleDefault
+ 285          * Description    : 
+ 286          * Input          : 
+ 287          * Output         : None
+ 288          * Return         : None
+ 289          *******************************************************************************/
+ 290          void MCL_ModuleDefault(void)
+ 291          {
+ 292   1        TIM2_ARR = PWMARR;       //载波频率 
+ 293   1        //----------------------------------
+ 294   1        //电机运行方向设置 端子控制
+ 295   1        Ctl.direction = Uc.flg.FR; 
+ 296   1      
+ 297   1        //----------------------------------
+ 298   1        //Step 清零
+ 299   1        Ctl.Step = 5;
+ 300   1        Ctl.StepPre = 0;
+ 301   1      
+C51 COMPILER V9.52.0.0   MC_INIT                                                           08/07/2017 14:18:18 PAGE 6   
+
+ 302   1        #if (POSITION_FB_MODE == SENSORLESS) 
+ 303   1        BemfDefault();           //BEMF清零
+ 304   1        #else
+                Drv.Hall.u8ChangePhaseNum = 0;
+                #endif
+ 307   1      //----------------------------------
+ 308   1        #if(SPEED_CLOSE_EN)     //速度闭环
+                Ctl.spd.refCur = 0;  
+                Pid_spdInit();  
+                #else       
+ 312   1        Drv.PWM.DutytargetOpen = MOTOR_TARGRT_DUTY;
+ 313   1        Drv.PWM.Dutytarget     = Drv.PWM.DutytargetOpen;
+ 314   1        Drv.PWM.DutyCurrent    = 0;  
+ 315   1        #endif
+ 316   1      
+ 317   1        #if(CURRENT_CLOSE_EN)
+                Pid_isInit();          //电流闭环
+                #endif
+ 320   1      //----------------------------------
+ 321   1        TimNmsDefault();       //计时器清零
+ 322   1        Key_init();            //端子清零
+ 323   1        PwmInResetFlag = 0x7F;
+ 324   1      
+ 325   1      //==================================
+ 326   1        #if(MOTORCIRCLECALEEN)  //
+                Ctl.spd.ComNum  = 0;
+                Ctl.spd.CircleNum = 0;
+                #endif
+ 330   1        
+ 331   1        #if(FAILSTOREEN) //故障记录
+                Ctl.E_message.State = MOTOR_NONE;
+                Ctl.E_message.ErrorF = 0;
+                #endif
+ 335   1        
+ 336   1        #if(OVERLOAD_EN) //过载
+                MCL_OverLoadInit(MECASEOVERLOAD0,MECASEOVERLOAD1,MECASEOVERLOAD2,MECASEOVERLOAD3,OL0NMS,OL1NMS,OL2NMS,OL
+             -3NMS);  
+                #endif
+ 339   1        
+ 340   1        #if(CBCCP_EN)   //逐波限流
+                Ctl.Cbcc.FoCounter = 0;
+                Ctl.Cbcc.ReCounter = 0;
+                #endif
+ 344   1        
+ 345   1        #if(BEEPSCAN_EN) //电机发声
+ 346   1        BeepInit();
+ 347   1        #endif
+ 348   1      }
+ 349          
+ 350          u8 Delay(u16 timer)
+ 351          {
+ 352   1        while(timer--) _nop_();
+ 353   1        return(0);  
+ 354   1      }
+ 355          
+ 356          u8 Delayus(u16 timer)
+ 357          {
+ 358   1        while(timer--) Delay(24);
+ 359   1        return(0);  
+ 360   1      }
+ 361          
+ 362          
+C51 COMPILER V9.52.0.0   MC_INIT                                                           08/07/2017 14:18:18 PAGE 7   
+
+ 363          void Bemfinit(void)
+ 364          {
+ 365   1        Ctl.Bemf.SPItest = BEMF_TEST;
+ 366   1        Ctl.Bemf.IRQ = BEMFNONE;
+ 367   1        
+ 368   1        Ctl.Ramp.cpmode = RAMP_MODE;
+ 369   1        //定位，拖动参数设定
+ 370   1        Ctl.Alig.duty   = ALIGNMENT_DUTY; 
+ 371   1        Ctl.Alig.timNms = ALIGNMENTNMS;  
+ 372   1      
+ 373   1        //启动参数调整区
+ 374   1        Ctl.Ramp.cpNumA = 0;
+ 375   1        Ctl.Ramp.cpNumB = 0;
+ 376   1        Ctl.Ramp.cpNms = RAMP_TIM_STA;
+ 377   1        Ctl.Ramp.cpNmsCount = 0;
+ 378   1        Ctl.Ramp.cptimSta   = RAMP_TIM_STA;
+ 379   1        Ctl.Ramp.cptimEnd   = RAMP_TIM_END;
+ 380   1        Ctl.Ramp.cptimstep  = RAMP_TIM_STEP;       
+ 381   1        Ctl.Ramp.cpDutySta  = RAMP_DUTY_STA;
+ 382   1        Ctl.Ramp.cpDutyEnd  = RAMP_DUTY_END;
+ 383   1        Ctl.Ramp.cpDutystep = RAMP_DUTY_INC;
+ 384   1        Ctl.Ramp.cpFinalNumB = RAMP_STEP_COUNTER;
+ 385   1        Ctl.Ramp.cpCntErr = 0;
+ 386   1        Ctl.Ramp.cpCntFail = 0;
+ 387   1        Ctl.Ramp.cpCntNormal = 0;
+ 388   1        Ctl.Ramp.cpNumFail= RampNumFail;
+ 389   1        
+ 390   1        Ctl.Ramp.cpBEMFCnt = RampDetecBEMFCnt;
+ 391   1        Ctl.Ramp.cpBEMFCntFilt = RampDetecBEMFCntFilt;
+ 392   1        Ctl.Ramp.cpMaskTime = TempRampMaskTime;
+ 393   1        
+ 394   1        Ctl.Bemf.CTAngle = TEMPDELAYANGLE;
+ 395   1        Ctl.Bemf.MaskAngle = TEMPMASKANGLE;
+ 396   1      
+ 397   1        Drv.Stk.Calcnum = SRKBNUM;
+ 398   1      
+ 399   1        MDUControl.DelayAngleOutRef = 0;
+ 400   1      }
+ 401          
+ 402          void PWMinit(void)
+ 403          {
+ 404   1        Drv.PWM.DutytargetOpen = 0;
+ 405   1        Drv.PWM.DutyCurrent    = 0;
+ 406   1        Drv.PWM.Dutytarget     = 0;  
+ 407   1        Drv.PWM.DutyIncValue  = SPEED_INCVALUE;
+ 408   1        Drv.PWM.DutyDecValue  = SPEED_DECVALUE;
+ 409   1        Drv.PWM.DutyMax = MOTOR_VS_MAX;
+ 410   1        Drv.PWM.DutyMin = MOTOR_VS_MIN;
+ 411   1        Drv.PWM.DutyLimitMaxRef = MECASECURRENTLIMITMAXREF;
+ 412   1        Drv.PWM.DutyLimitADD = 100;
+ 413   1      }
+ 414          void Hallinit(void)
+ 415          {
+ 416   1        Drv.Hall.s16AdvanceEangle = TEMPHALLADVANCEEANGLE; //HALL位置反馈换相超前角度
+ 417   1      
+ 418   1        if(Drv.Hall.s16AdvanceEangle < -50.0/60.0*32767)
+ 419   1        {
+ 420   2          Drv.Hall.s16AdvanceEangle = -50.0/60.0*32767;
+ 421   2        }
+ 422   1        else if(Drv.Hall.s16AdvanceEangle < -10.0/60.0*32767)
+ 423   1        {
+ 424   2          ;
+C51 COMPILER V9.52.0.0   MC_INIT                                                           08/07/2017 14:18:18 PAGE 8   
+
+ 425   2        } 
+ 426   1        else if(Drv.Hall.s16AdvanceEangle < 0)
+ 427   1        {
+ 428   2          Drv.Hall.s16AdvanceEangle = -10.0/60.0*32767;
+ 429   2        }    
+ 430   1        else if(Drv.Hall.s16AdvanceEangle == 0)
+ 431   1        {
+ 432   2          Drv.Hall.s16AdvanceEangle = 0;
+ 433   2        }
+ 434   1        else if(Drv.Hall.s16AdvanceEangle > 30/60.0*32767)
+ 435   1        {
+ 436   2          Drv.Hall.s16AdvanceEangle = 30.0/60.0*32767;
+ 437   2        }
+ 438   1      }
+ 439          
+ 440          void BemfDefault(void)
+ 441          {
+ 442   1        Drv.Stk.BemfTabA = 0;
+ 443   1        Drv.Stk.BemfTabB = 0;
+ 444   1        Drv.Stk.RefNumX = 0;
+ 445   1        Drv.Stk.RefNumY = 0;
+ 446   1        Drv.Stk.RefNumZ = 0;
+ 447   1        Drv.Stk.BemfFR = 0xFF;
+ 448   1        //定位，拖动参数设定
+ 449   1        //Ctl.Alig.duty   = ALIGNMENT_DUTY; //0.4
+ 450   1        //Ctl.Alig.timNms = ALIGNMENTNMS;   //380
+ 451   1      
+ 452   1        //启动参数调整区
+ 453   1        Ctl.Ramp.cpNumA = 0;
+ 454   1        Ctl.Ramp.cpNumB = 0;
+ 455   1        Ctl.Ramp.cpNms = Ctl.Ramp.cptimSta;
+ 456   1        Ctl.Ramp.cpNmsCount = 0;
+ 457   1        Ctl.Ramp.cpCntErr = 0;
+ 458   1        Ctl.Ramp.cpCntFail = 0;
+ 459   1        Ctl.Ramp.cpCntNormal = 0;  
+ 460   1        Ctl.Bemf.MaskTime = TempRampMaskTime;
+ 461   1        Ctl.Section.Cur = 0;
+ 462   1        Ctl.Section.Per = 0;
+ 463   1        Ctl.Section.ErrCounter = 0;
+ 464   1      
+ 465   1        MDUControl.DelayAngleOutRef = 0;
+ 466   1      }
+ 467          void TimNmsDefault(void)
+ 468          {
+ 469   1        //----------------------------------
+ 470   1        //过压欠压判断时间，堵转 参数清零
+ 471   1        Ctl.Tim.OVnms = 0;
+ 472   1        Ctl.Tim.UVnms = 0;
+ 473   1        Ctl.Tim.Nonms = 0;
+ 474   1        Ctl.Tim.OCnms = 0;
+ 475   1        Ctl.Tim.OH1nms = 0;
+ 476   1        Ctl.Tim.OH1REnms = 0;
+ 477   1        Ctl.Tim.OH2nms = 0;
+ 478   1        Ctl.Tim.OH2REnms = 0;
+ 479   1      
+ 480   1        Ctl.Tim.STAnms = 0;           //堵转
+ 481   1        Ctl.Tim.STB1nms = 0;          //失速1
+ 482   1        Ctl.Tim.STB2nms = 0;          //失速2
+ 483   1        Ctl.Tim.LED_OnOffms = 0;
+ 484   1        Ctl.Tim.LED_Cunter = 0;
+ 485   1      }
+
+C51 COMPILER V9.52.0.0   MC_INIT                                                           08/07/2017 14:18:18 PAGE 9   
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    982    ----
+   CONSTANT SIZE    =     16    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

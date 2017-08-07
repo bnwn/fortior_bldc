@@ -1,0 +1,321 @@
+C51 COMPILER V9.52.0.0   INTERRUPT                                                         08/07/2017 14:18:18 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE INTERRUPT
+OBJECT MODULE PLACED IN .\obj\Interrupt.obj
+COMPILER INVOKED BY: C:\Keil_v4\C51\BIN\C51.EXE User\Source\Interrupt.c LARGE OMF2 WARNINGLEVEL(0) OPTIMIZE(SIZE) BROWSE
+                    - NOAREGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\Interrupt.lst) TABS(2) OBJECT(.\obj\Interrupt.obj)
+
+line level    source
+
+   1          /************************ (C) COPYRIGHT 2015 FT *******************************
+   2          * File Name          : 
+   3          * Author             : Application Team  Tom.wang 
+   4          * Version            : V2.0.0
+   5          * Date               : 06/15/2015
+   6          * Description        : 
+   7          ********************************************************************************
+   8          /*******************************************************************************
+   9          * All Rights Reserved
+  10          *******************************************************************************/
+  11          /* Includes ------------------------------------------------------------------*/
+  12          #include <FU68xx.h>
+  13          #include <Myproject.h>
+  14          
+  15          /* Private typedef -----------------------------------------------------------*/
+  16          
+  17          /* Private define ------------------------------------------------------------*/
+  18          /* Private macro -------------------------------------------------------------*/
+  19          /* Private variables ---------------------------------------------------------*/
+  20          //
+  21          extern u8 xdata WriteRomValue;
+  22          extern u8 xdata ReadRomValue;
+  23          /* Private function prototypes -----------------------------------------------*/
+  24          /* Private functions ---------------------------------------------------------*/
+  25          
+  26          /*******************************************************************************
+  27          * Function Name  : TIM1_INT    
+  28          * Description    : HALL读取，转速计算
+  29          * Input          : 
+  30          * Output         : 
+  31          * Return         : 1
+  32          *******************************************************************************/
+  33          
+  34          
+  35          void TIM1_ISR(void) interrupt 5
+  36          {                                       
+  37   1        if((GetBit(TIM1_SR,WTIF))&&(GetBit(TIM1_IER,WTIE)))    //写入中断 中断
+  38   1        {  
+  39   2          CLRFlag_WTIF;
+  40   2        }
+  41   1        if((GetBit(TIM1_SR,PDIF))&&(GetBit(TIM1_IER,PDIE)))    //位置检测 中断
+  42   1        {
+  43   2          Ctl.Tim.STAnms = 0;                    //检测到位置，清零
+  44   2      
+  45   2          if(Ctl.Bemf.SPItest)
+  46   2          {
+  47   3            MOSI_ONOFF;                          //++++测试信号 
+  48   3          }
+  49   2          #if (POSITION_FB_MODE == HALLSENSOR)   //HALL 位置
+                  {
+                    Drv.Hall.Status = Hall_IRQHandler(); //HALL读取   
+              
+                    #if (HALLADVANCEEANGLE == 0)
+                    Drv_HallDriveD(Ctl.Step);            //正常换相
+C51 COMPILER V9.52.0.0   INTERRUPT                                                         08/07/2017 14:18:18 PAGE 2   
+
+                    #else
+                    Drv_HallDriveS(Ctl.Step);            //超前&滞后换相
+                    #endif
+                    Drv.speed.EventPeriod = TIM1_BCCR; 
+              
+                    #if(MOTORCIRCLECALEEN)
+                    Ctl.spd.MechCircleNum = Drv_RotorCircleNumCalc(Ctl.Step); //运行圈数计算
+                    #endif   
+                  }
+                  #elif (POSITION_FB_MODE == SENSORLESS) //BEMF 检测
+  65   2          Drv_BemfTim1PDapp();
+  66   2          #endif
+  67   2          CLRFlag_PDIF;
+  68   2        }
+  69   1      
+  70   1        //if((GetBit(TIM1_SR,RUIF))&&(GetBit(TIM1_IER,RUIF)))  //下溢中断 
+  71   1        if(GetBit(TIM1_SR,RUIF))                               //
+  72   1        {
+  73   2          #if (POSITION_FB_MODE == SENSORLESS)
+  74   2          Drv_BemfTim1RUapp();
+  75   2          #else
+                  if(Ctl.Bemf.IRQ == BEMFCOMMUTATION)      //换相中断，TIM1触发换相模式
+                  {
+                    if(Ctl.Bemf.SPItest)
+                    {
+                      MISO_ONOFF;                           //++++测试信号
+                    }
+                    SetBit(TIM1_CR3,OPS0,0);                //软件写DBR触发换相
+                    Drv.Hall.u8ChangePhaseFlag = 0xFF;
+                    Ctl.Bemf.IRQ = BEMFNONE;
+                    SetBit(TIM1_IER,RUIE,0);               //禁止Preload定时器下溢中断
+                    SetBit(TIM1_CR1, RCEN, 0);             //失能Preload定时器
+                  }
+                  #endif
+  89   2          CLRFlag_RUIF;
+  90   2        }
+  91   1        
+  92   1        if((GetBit(TIM1_SR,BOIF))&&(GetBit(TIM1_IER,BOIF)))    //上溢中断 使能
+  93   1        {
+  94   2          CLRFlag_BOIF;
+  95   2          
+  96   2          Drv.speed.InputSelect++;
+  97   2          if(Drv.speed.InputSelect > 100)
+  98   2          {
+  99   3            Drv.speed.InputSelect = 100;
+ 100   3          }
+ 101   2      
+ 102   2          Drv.speed.EventPeriod = 32767;
+ 103   2          Drv.speed.Speed = 0;
+ 104   2          Drv.speed.SpeedRpm = 0; 
+ 105   2          Ctl.spd.rpm = Drv.speed.SpeedRpm;
+ 106   2          Ctl.spd.rpmavg = Ctl.spd.rpm;
+ 107   2        }
+ 108   1      }
+ 109          /*******************************************************************************
+ 110          * Function Name  : TIM23_ISR
+ 111          * Description    : MainISR 
+ 112          * Input          : 
+ 113          * Output         : 
+ 114          * Return         : 1
+ 115          *******************************************************************************/
+ 116          void TIM23_ISR(void)  interrupt 9
+C51 COMPILER V9.52.0.0   INTERRUPT                                                         08/07/2017 14:18:18 PAGE 3   
+
+ 117          {
+ 118   1        u32 Temp32A,Temp32B;
+ 119   1        u16 tPWMINHigh;
+ 120   1        /*TIM2 Interrupt*/
+ 121   1        if(GetBit(TIM2_CR1, T2IR))     //比较匹配中断
+ 122   1        {   
+ 123   2          CLRFlag_T2IR;
+ 124   2        }
+ 125   1        if(GetBit(TIM2_CR1, T2IF))     //溢出中断
+ 126   1        {
+ 127   2          CLRFlag_T2IF;
+ 128   2      //    if(GetBit(ADC_STA, ADCIF))    //ADC软件触发中断服务函数
+ 129   2      //    {
+ 130   2      //      //ADCGetValue();            //ADC数据读取
+ 131   2      //      CLR(ADC_STA, ADCIF);
+ 132   2      //    }
+ 133   2          SetBit(ADC_STA, ADCBSY, 1);  //启动ADC采样转换
+ 134   2          MDUAPP();                    //
+ 135   2        }
+ 136   1        /*TIM3 Interrupt*/
+ 137   1        if(GetBit(TIM3_CR1, T3IR))
+ 138   1        { 
+ 139   2          u32 Temp32A,Temp32B;
+ 140   2      
+ 141   2          #if(PWMINSREF_EN)
+ 142   2          if((TIM3_DR > TempPWMINHighMinFilt)&&(TIM3_DR < TempPWMINHighMaxFilt))
+ 143   2          {
+ 144   3            PWMINCtl.PWMINHigh = TIM3_DR;//- TempPWMINHighMinFilt;
+ 145   3            
+ 146   3            if (PWMINCtl.PWMINIdle && (PWMINCtl.PWMINHigh < (TempPWMINStartUp + TempPWMINHighMinFilt))) {
+ 147   4              tPWMINHigh = TempPWMINIdling - TempPWMINHighMinFilt;
+ 148   4            } else {
+ 149   4              PWMINCtl.PWMINIdle = FALSE;
+ 150   4              tPWMINHigh = TIM3_DR - TempPWMINHighMinFilt; 
+ 151   4            }
+ 152   3            
+ 153   3            //MDUControl.SpeedSref = 32767*((float)PWMINCtl.PWMINHigh/(float)PWMINCtl.PWMINHighMax);
+ 154   3            //速度给定标幺化_IQ(15) 0~32767
+ 155   3            Temp32A = (u32)tPWMINHigh<<15;
+ 156   3            Temp32B =  (u32)PWMINCtl.PWMINHighMax;
+ 157   3            MDUControl.SpeedSref = MDU_DIV_U16(&Temp32A,&Temp32B);
+ 158   3            MDUControl.FlagTargetSpeed = 0x7F ;              //速度给定计算请求 
+ 159   3            Drv.PWM.DutytargetOpen = MDUControl.TargetSpeed; //MDU计算速度给定值
+ 160   3          }
+ 161   2          #endif
+ 162   2          CLRFlag_T3IR;
+ 163   2        }
+ 164   1        if(GetBit(TIM3_CR1, T3IP))
+ 165   1        {
+ 166   2          CLRFlag_T3IP;
+ 167   2        }
+ 168   1        if(GetBit(TIM3_CR1, T3IF))
+ 169   1        {
+ 170   2          #if((PWMINSREF_EN)||(PWMINONOFF_EN))
+ 171   2          {
+ 172   3            PWMINCtl.PWMINHigh = 0;
+ 173   3            PWMINCtl.PWMStatus = PWMIN;
+ 174   3          }
+ 175   2          #endif
+ 176   2          CLRFlag_T3IF;
+ 177   2        }
+ 178   1      }
+C51 COMPILER V9.52.0.0   INTERRUPT                                                         08/07/2017 14:18:18 PAGE 4   
+
+ 179          
+ 180          /*******************************************************************************
+ 181          * Function Name  : TIM45_ISR
+ 182          * Description    : 速度环控制 优先级1,最高优先级 硬件过流
+ 183          * Input          : None
+ 184          * Output         : 
+ 185          * Return         : None
+ 186          *******************************************************************************/
+ 187          /* TIM45 overflow interrupt---------------------------------------------------*/
+ 188          void TIM45_ISR(void) interrupt 10
+ 189          {
+ 190   1        /*TIM4 Interrupt*/
+ 191   1        if(GetBit(TIM4_CR1, T4IF))
+ 192   1        { 
+ 193   2          MainISR();
+ 194   2          
+ 195   2          Key_Filtrate();
+ 196   2          #if(PWMINONOFF_EN)  
+ 197   2          if(Ctl.State >= MOTOR_STOP)
+ 198   2          {
+ 199   3            PWMINOnOffSwitch();
+ 200   3          }
+ 201   2          #endif
+ 202   2          
+ 203   2          CLR(TIM4_CR1, T4IF);
+ 204   2        }
+ 205   1        /*TIM5 Interrupt*/
+ 206   1        if(GetBit(TIM5_CR1, T5IF))
+ 207   1        {
+ 208   2          CLR(TIM5_CR1, T5IF);
+ 209   2        }
+ 210   1      }
+ 211          /*******************************************************************************
+ 212          * Function Name  : ADC_ISR
+ 213          * Description    : ADCGetValue
+ 214          * Input          : None
+ 215          * Output         : None
+ 216          * Return         : None      
+ 217          
+ 218          *******************************************************************************/
+ 219          void ADC_ISR(void) interrupt 6      
+ 220          {
+ 221   1        if(GetBit(ADC_STA, ADCIF))    //ADC软件触发中断服务函数
+ 222   1        {
+ 223   2          ADCGetValue();              //ADC数据读取
+ 224   2          CLR(ADC_STA, ADCIF);
+ 225   2        }
+ 226   1        
+ 227   1        if(GetBit(ADC_CFG, ADTRIGIF)) //ADC触发中断服务函数
+ 228   1        {
+ 229   2          CLR(ADC_CFG, ADTRIGIF);
+ 230   2        }
+ 231   1      }
+ 232          /*******************************************************************************
+ 233          * Function Name  : CMP_ISR
+ 234          * Description    : CMP interrupt
+ 235          * Input          : None
+ 236          * Output         : 
+ 237          * Return         : None
+ 238          *******************************************************************************/
+ 239          #if (EFAL == FO_CMP)
+ 240          void CMP_ISR(void) interrupt 7
+C51 COMPILER V9.52.0.0   INTERRUPT                                                         08/07/2017 14:18:18 PAGE 5   
+
+ 241          {
+ 242   1        if(GetBit(CMP_SR, CMP3INTR))
+ 243   1        {
+ 244   2          CLR(CMP_SR, CMP3INTR);
+ 245   2          #if(HARD_OC_EN)
+                  MCL_BKIN_IRQHandler();    //硬件过流
+                  #endif
+ 248   2        }
+ 249   1      }
+ 250          #endif
+ 251          /*******************************************************************************
+ 252          * Function Name  : INT0_ISR
+ 253          * Description    : INT0 interrupt  FO中断，用于IPM硬件过流保护，中断优先级最高
+ 254          * Input          : None
+ 255          * Output         : 
+ 256          * Return         : None
+ 257          *******************************************************************************/
+ 258          #if (EFAL == FO_INT)
+              void INT0_ISR(void) interrupt 1
+              {
+                if(IF0)
+                {
+                  IF0 =0;
+                  #if(HARD_OC_EN)
+                  MCL_BKIN_IRQHandler();    //硬件过流
+                  #endif    
+                } 
+              }
+              #endif
+ 270          /*******************************************************************************
+ 271          * Function Name  : LVW_ISR    
+ 272          * Description    : 低压中断
+ 273          * Input          : 
+ 274          * Output         : 
+ 275          * Return         : 1
+ 276          *******************************************************************************/
+ 277          void LVW_ISR(void) interrupt 0
+ 278           {
+ 279   1         CLR(LVSR, LVWIF);
+ 280   1         if(WriteRomValue != ReadRomValue)
+ 281   1         {
+ 282   2           //Flash_KeyWriteValue((WriteRomValue));  //档位存储
+ 283   2         }
+ 284   1       }
+ 285           
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    799    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----      18
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

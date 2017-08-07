@@ -1,0 +1,30 @@
+".\Library\Source\FU68xx_System.LIB",
+".\User\Source\Ftech_BLDC2.3.1.LIB",
+".\obj\Interrupt.obj",
+".\obj\main.obj",
+".\obj\MC_init.obj",
+".\obj\MC_UserInterface_layer.obj",
+".\obj\MC_MotorFunction_layer.obj",
+".\obj\MC_MotorCotrol_layer.obj",
+".\obj\MC_MotorDriver_layer.obj",
+".\obj\MC_Key.obj",
+".\obj\MC_PwmIn.obj",
+".\obj\MC_Beep.obj",
+".\obj\MC_Led.obj",
+".\obj\fu68xx_Sys.obj",
+".\obj\fu68xx_Dmc.obj",
+".\obj\fu68xx_MCadc.obj",
+".\obj\fu68xx_MCamp.obj",
+".\obj\fu68xx_MCcmp.obj",
+".\obj\fu68xx_MCflash.obj",
+".\obj\fu68xx_MChall.obj",
+".\obj\fu68xx_MClpf.obj",
+".\obj\fu68xx_MCmdu.obj",
+".\obj\fu68xx_MCpid.obj",
+".\obj\fu68xx_MCspi.obj",
+".\obj\fu68xx_MCtime.obj",
+".\obj\fu68xx_MCuart.obj" 
+TO ".\obj\Ftech_BLDC" 
+
+PRINT(".\obj\Ftech_BLDC.map") DISABLEWARNING (16) 
+REMOVEUNUSED 

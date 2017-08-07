@@ -1,0 +1,213 @@
+C51 COMPILER V9.52.0.0   FU68XX_DMC                                                        08/07/2017 14:18:20 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE FU68XX_DMC
+OBJECT MODULE PLACED IN .\obj\fu68xx_Dmc.obj
+COMPILER INVOKED BY: C:\Keil_v4\C51\BIN\C51.EXE User\Source\fu68xx_Dmc.c LARGE OMF2 WARNINGLEVEL(0) OPTIMIZE(SIZE) BROWS
+                    -E NOAREGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\fu68xx_Dmc.lst) TABS(2) OBJECT(.\obj\fu68xx_Dmc.obj
+                    -)
+
+line level    source
+
+   1          
+   2          /************************ (C) COPYRIGHT 2015 FT *******************************
+   3          * File Name          : 
+   4          * Author             : Application Team  Tom.wang 
+   5          * Version            : V2.0.0
+   6          * Date               : 06/15/2015
+   7          * Description        : 
+   8          ********************************************************************************
+   9          /*******************************************************************************
+  10          * All Rights Reserved
+  11          *******************************************************************************/
+  12          
+  13          /* Includes ------------------------------------------------------------------*/
+  14          #include <FU68xx.h>
+  15          #include "sys_conf.h"
+  16          #include "fu68xx_MClpf.h"
+  17          #include "MC_MotorCotrol_layer.h"  
+  18          #include "MC_MotorDriver_layer.h" 
+  19          #include "MC_PwmIn.h"
+  20          #include "MC_Beep.h"
+  21          #include "fu68xx_Dmc.h"
+  22          /** @addtogroup FT68xx
+  23            * @{
+  24            */
+  25          
+  26          /* Private typedef -----------------------------------------------------------*/
+  27          /* Private define ------------------------------------------------------------*/
+  28          MDUControl_TypeDef xdata MDUControl;
+  29          
+  30          /* Private macro -------------------------------------------------------------*/
+  31          /* Private variables ---------------------------------------------------------*/
+  32          /* Private function prototypes -----------------------------------------------*/
+  33          
+  34          /* Private functions ---------------------------------------------------------*/
+  35          void speed_prd_calc(void);     //速度计算
+  36          void MDUInit(void);
+  37          void MDUControlInit(void);
+  38          void MDUAPP(void);
+  39          /*******************************************************************************
+  40          * Function Name  : speed_prd_calc    
+  41          * Description    : 速度计算模块，根据HALL信号计算速度
+  42          * Input          : TIM1_BCCR
+  43          * Output         : 速度单位 RPM
+  44          * Return         : 无
+  45          *******************************************************************************/
+  46          void PDEventPeriodCalc(void)
+  47          {
+  48   1        if(TIM1_BCCR > SRB3TIMEFILT)
+  49   1        {
+  50   2          Drv.speed.EventPeriod = TIM1_BCCR;  
+  51   2          //if(Drv.speed.EventPeriod > 1)
+  52   2          {
+  53   3            Ctl.Section.Cur = Drv.speed.EventPeriod;
+C51 COMPILER V9.52.0.0   FU68XX_DMC                                                        08/07/2017 14:18:20 PAGE 2   
+
+  54   3            Drv_Stb3Calc();
+  55   3          }    
+  56   2        }
+  57   1        //Ctl.Section.S[Ctl.Step] = v->EventPeriod;
+  58   1        Ctl.Section.Counter++;   
+  59   1      }
+  60          
+  61          /*-------------------------------------------------------------------------------------------------
+  62            Function Name : void MDU_Init(void)
+  63            Description   : MDU模块初始化，乘法结果移位，乘法模式
+  64            Input         : None
+  65            Output        : None
+  66          -------------------------------------------------------------------------------------------------*/
+  67          void MDUInit(void)
+  68          {
+  69   1      /*-------------------------------------------------------------------------------------------------
+  70   1        乘法器初始化
+  71   1        00:乘法结果右移0位  01:乘法结果右移8位  10:乘法结果右移12位   11:乘法结果右移15位
+  72   1      -------------------------------------------------------------------------------------------------*/
+  73   1        SetBit(MD_MODE, ALIGN1, 0);
+  74   1        SetBit(MD_MODE, ALIGN0, 0);                              // 00:乘法结果右移0位  
+  75   1      
+  76   1        SetBit(MD_MODE, MDSN, 0);                                // 选择无符号乘法
+  77   1      
+  78   1        MDUControlInit();
+  79   1      }
+  80          
+  81          /*-------------------------------------------------------------------------------------------------
+  82            Function Name : void MDUControlInit(void)
+  83            Description   : MDU控制函数标志位初始化
+  84            Input         : 无
+  85            Output        : 无
+  86          -------------------------------------------------------------------------------------------------*/
+  87          void MDUControlInit(void)
+  88          {
+  89   1      
+  90   1        #if(ADCSREF_EN) 
+                MDUControl.AlineX2 = ADCSREFINMAX;
+                MDUControl.AlineX1 = ADCSREFINMIN;
+                //MDUControl.SpeedSref = Drv.AdcMeas.Sref;
+                MDUControl.SpeedSrefErr = (u32)(MDUControl.AlineX2 - MDUControl.AlineX1);
+                
+                MDUControl.AlineA = (u16)(ADCAlineA*32767);
+                MDUControl.AlineB = ADCAlineB;
+                #endif
+  99   1        
+ 100   1        MDUControl.FlagPWMDuty = 0;
+ 101   1      
+ 102   1        MDUControl.FlagDelayAngleTime = 0;
+ 103   1        MDUControl.FlagMaskAngleTime = 0;
+ 104   1        
+ 105   1        MDUControl.FlagCalcSpeed = 0;
+ 106   1        MDUControl.FlagCalcSpeedRpm = 0;
+ 107   1      }
+ 108          /*-------------------------------------------------------------------------------------------------
+ 109            Function Name : void MDUAPP(void)
+ 110            Description   : MDU控制函数，运行频率为PWMFre(16K)，最高优先级，软件系统的所有MDU运算都在此函数
+ 111                            执行，函数扫描到相应的标志位后进行相应的运算。
+ 112            Input         : 无
+ 113            Output        : 无
+ 114          -------------------------------------------------------------------------------------------------*/
+ 115          void MDUAPP(void)
+C51 COMPILER V9.52.0.0   FU68XX_DMC                                                        08/07/2017 14:18:20 PAGE 3   
+
+ 116          {
+ 117   1        if(MDUControl.FlagMaskAngleTime == 0x7F)
+ 118   1        {
+ 119   2          MDUControl.MaskAngleOut = MDU_MULA_U16(Drv.speed.EventPeriod, MDUControl.MaskAngleIn, 15); 
+ 120   2          MDUControl.FlagMaskAngleTime = 0XFF;
+ 121   2        }
+ 122   1        if(MDUControl.FlagDelayAngleTime == 0x7F)
+ 123   1        {
+ 124   2          MDUControl.DelayAngleOut =MDU_MULA_U16(Drv.speed.EventPeriod, MDUControl.DelayAngleIn, 15); 
+ 125   2          MDUControl.FlagDelayAngleTime = 0XFF;
+ 126   2        }
+ 127   1        if(MDUControl.FlagPWMDuty == 0x7F)
+ 128   1        {
+ 129   2            if(Ctl.State == MOTOR_STOP)
+ 130   2            {
+ 131   3              if(Beep.BeepRequest != 0x7F)
+ 132   3              {
+ 133   4                TIM2_DR = MDU_MULA_U16(MDUControl.DutyCurrent,PWMARR,15);
+ 134   4              }
+ 135   3            }    
+ 136   2            else if(Ctl.State == MOTOR_OPENLOOP)
+ 137   2            {
+ 138   3              TIM2_DR = MDU_MULA_U16(MDUControl.DutyCurrent,RAMP_PWMARR,15);
+ 139   3            }
+ 140   2            else
+ 141   2            {
+ 142   3              TIM2_DR = MDU_MULA_U16(MDUControl.DutyCurrent,PWMARR,15);
+ 143   3            }
+ 144   2            if(TIM2_DR < RAMP_PWMARR>>1)
+ 145   2            {
+ 146   3              TIM2_CMTR = TIM2_DR+(RAMP_PWMARR - TIM2_DR)>>1;
+ 147   3            }
+ 148   2            else
+ 149   2            {
+ 150   3              TIM2_CMTR = TIM2_DR>>1; 
+ 151   3            }
+ 152   2      
+ 153   2            TIM2_ADTR = TIM2_DR>>1; 
+ 154   2            MDUControl.FlagPWMDuty = 0xFF;
+ 155   2        }
+ 156   1      
+ 157   1        if(MDUControl.FlagCalcSpeed == 0x7F)
+ 158   1        {
+ 159   2          Drv.speed.Speed = MDU_DIV_U32(Drv.speed.SpeedScaler,Drv.speed.EventPeriod);//速度标幺值计算 
+ 160   2          MDUControl.FlagCalcSpeed = 0xFF;
+ 161   2        }
+ 162   1        if(MDUControl.FlagCalcSpeedRpm == 0x7F)
+ 163   1        {
+ 164   2          MDU_MULA_U32(Drv.speed.Speed,Drv.speed.BaseRpm,15,&Drv.speed.SpeedRpm );     //实际转速计算
+ 165   2          MDUControl.FlagCalcSpeedRpm = 0xFF;
+ 166   2        } 
+ 167   1        
+ 168   1        if(MDUControl.FlagTargetSpeed == 0x7F)
+ 169   1        {    if(MDUControl.SpeedSref > MDUControl.AlineX1)
+ 170   2          {  
+ 171   3            //y = A*x + B ;
+ 172   3            MDUControl.TargetSpeed = MDU_MULA_U16(MDUControl.SpeedSref,MDUControl.AlineA,15) + MDUControl.AlineB
+             -;
+ 173   3          }
+ 174   2          MDUControl.FlagTargetSpeed = 0xFF;
+ 175   2        }    
+ 176   1      }
+C51 COMPILER V9.52.0.0   FU68XX_DMC                                                        08/07/2017 14:18:20 PAGE 4   
+
+ 177            
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    519    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =     38    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

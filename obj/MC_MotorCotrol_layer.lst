@@ -1,0 +1,1212 @@
+C51 COMPILER V9.52.0.0   MC_MOTORCOTROL_LAYER                                              08/07/2017 14:18:18 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE MC_MOTORCOTROL_LAYER
+OBJECT MODULE PLACED IN .\obj\MC_MotorCotrol_layer.obj
+COMPILER INVOKED BY: C:\Keil_v4\C51\BIN\C51.EXE User\Source\MC_MotorCotrol_layer.c LARGE OMF2 WARNINGLEVEL(0) OPTIMIZE(S
+                    -IZE) BROWSE NOAREGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\MC_MotorCotrol_layer.lst) TABS(2) OBJECT(
+                    -.\obj\MC_MotorCotrol_layer.obj)
+
+line level    source
+
+   1          
+   2          /************************ (C) COPYRIGHT 2015 FT *******************************
+   3          * File Name          : 
+   4          * Author             : Application Team  Tom.wang 
+   5          * Version            : V2.0.0
+   6          * Date               : 06/15/2015
+   7          * Description        : 
+   8          ********************************************************************************
+   9          /*******************************************************************************
+  10          * All Rights Reserved
+  11          *******************************************************************************/
+  12          
+  13          /* Includes ------------------------------------------------------------------*/
+  14          #include <FU68xx.h>
+  15          #include <Myproject.h>
+  16          
+  17          /** @addtogroup FT68xx
+  18            * @{
+  19            */
+  20          
+  21          /* Private typedef -----------------------------------------------------------*/
+  22          /* Private define ------------------------------------------------------------*/
+  23          /* Private macro -------------------------------------------------------------*/
+  24          /* Private variables ---------------------------------------------------------*/
+  25          MCL_TypeDef xdata Ctl;    
+  26          /* Private function prototypes -----------------------------------------------*/
+  27          void MCL_MotorC(void);
+  28          void MCL_BKIN_IRQHandler(void);
+  29          void MainISR(void);
+  30          
+  31          static u8 MCL_Init(void); 
+  32          static u8 MCL_Ready(void);
+  33          static u8 MCL_Strack(void);
+  34          static u8 MCL_Precharge(void);
+  35          static u8 MCL_Alignment(void);
+  36          static u8 MCL_OpenLoop(void);
+  37          static u8 MCL_Normal(void);
+  38          static u8 MCL_Stop(void);
+  39          static u8 MCL_Failure(void);
+  40          
+  41          static void SysTick_1ms(void);
+  42          static void BLDC_BRK_IRQHandler(void); 
+  43          static void MCL_ChkPowerStage(void);
+  44          static void MCL_ChkSysStage(void);
+  45          
+  46          /* Private functions ---------------------------------------------------------*/
+  47          /*******************************************************************************
+  48          * Function Name  : MCL_MotorC
+  49          * Description    : 
+  50          * Input          : None
+  51          * Output         : None
+  52          * Return         : 1
+  53          *******************************************************************************/
+C51 COMPILER V9.52.0.0   MC_MOTORCOTROL_LAYER                                              08/07/2017 14:18:18 PAGE 2   
+
+  54          void MCL_MotorC(void)
+  55          {
+  56   1        switch(Ctl.State)
+  57   1        {
+  58   2          case MOTOR_INIT:
+  59   2            while(MCL_Init() == 0);
+  60   2            break;
+  61   2          case MOTOR_STOP:
+  62   2            while(MCL_Stop() == 0);
+  63   2            break;
+  64   2          case MOTOR_READY:
+  65   2            while(MCL_Ready() == 0);
+  66   2            break;
+  67   2          case MOTOR_STRACK:
+  68   2            while(MCL_Strack() == 0);
+  69   2            break;  
+  70   2          case MOTOR_PRECHARGE:
+  71   2            while(MCL_Precharge() == 0);
+  72   2            break;
+  73   2          case MOTOR_ALIGNMENGT:
+  74   2           while(MCL_Alignment() ==0 );
+  75   2            break;
+  76   2          case MOTOR_OPENLOOP:     
+  77   2            while(MCL_OpenLoop() == 0);
+  78   2            break;
+  79   2          case MOTOR_NORMAL:
+  80   2            while(MCL_Normal() == 0);
+  81   2            break;
+  82   2          case MOTOR_FAILURE:
+  83   2            while(MCL_Failure() == 0);
+  84   2            break;
+  85   2          default:
+  86   2            break;
+  87   2        }
+  88   1      }
+  89          
+  90          /*******************************************************************************
+  91          * Function Name  : MCL_Init
+  92          * Description    : 
+  93          * Input          : None
+  94          * Output         : None
+  95          * Return         : 1
+  96          *******************************************************************************/
+  97          u8 MCL_Init(void)
+  98          { 
+  99   1        u8 tValue;
+ 100   1      
+ 101   1        MCL_ModuleInit();
+ 102   1        PWMOUT_OFF;
+ 103   1        #if(MOS_SELFINSPECTION)
+                //tValue = Drv_SelfInspection(1,0.4,0.1);
+                //while(tValue);  //自检
+                #endif
+ 107   1        BeepRequestFun(SelfInspection);
+ 108   1        #if(DriverFD6536_EN) 
+                FD6536_EN;
+                #endif
+ 111   1      
+ 112   1        #if (EFAL == FO_CMP)
+ 113   1        SetBit(CMP_CR2, CMP3EN, 1);  //下桥打开，自举电容充电导致硬件过流
+ 114   1        #elif (EFAL == FO_INT)
+                EX0 = 1;
+C51 COMPILER V9.52.0.0   MC_MOTORCOTROL_LAYER                                              08/07/2017 14:18:18 PAGE 3   
+
+                #endif
+ 117   1      
+ 118   1        Ctl.State = MOTOR_STOP;
+ 119   1        PWMINCtl.PWMINIdle = TRUE;
+ 120   1        return 1;
+ 121   1      }
+ 122          
+ 123          /*******************************************************************************
+ 124          * Function Name  : MCL_Stop
+ 125          * Description    : 
+ 126          * Input          : None
+ 127          * Output         : None
+ 128          * Return         : 1
+ 129          *******************************************************************************/
+ 130          u8 MCL_Stop(void)
+ 131          {
+ 132   1        if(Beep.BeepRequest == 0x7F)
+ 133   1        {
+ 134   2          ;
+ 135   2        }
+ 136   1        else
+ 137   1        {
+ 138   2          Drv.PWM.Dutytarget = BREAK_VALUE;                 //充电占空比
+ 139   2          Drv.PWM.DutyCurrent = Drv.PWM.Dutytarget;
+ 140   2          Drv.PWM.u16cycle = Fu68xx_PWM_Update(Drv.PWM.DutyCurrent);  //占空比给定
+ 141   2          
+ 142   2          #if (POSITION_FB_MODE == SENSORLESS)
+ 143   2          Drv_BemfPhaseChoice(7);
+ 144   2          #endif
+ 145   2      
+ 146   2          if((Ctl.FnStopmodeC == FREE_DOWN)||(Ctl.FnStopmodeC == SLOWING_DOWN))
+ 147   2          {
+ 148   3            PWMOUT_OFF;
+ 149   3            if(Ctl.Start == FALSE) 
+ 150   3            {
+ 151   4              Ctl.State = MOTOR_STOP;
+ 152   4              PWMINCtl.PWMINIdle = TRUE;
+ 153   4            }
+ 154   3            else
+ 155   3            {
+ 156   4              Ctl.State =  MOTOR_READY;
+ 157   4              DRV_OE_ON;
+ 158   4            }
+ 159   3          }
+ 160   2          else if(Ctl.FnStopmodeC == BREAK_DOWN) 
+ 161   2          {
+ 162   3            if(Ctl.Tim.u16BrankwaitNms < BREAK_DOWNWALTNMS)
+ 163   3            {
+ 164   4              if(BREAK_VALUE == 32767)
+ 165   4              {
+ 166   5                PWM_BREAK;
+ 167   5              }
+ 168   4              else
+ 169   4              {
+ 170   5                PWM_ULVLWL_PWM;
+ 171   5              }
+ 172   4            }
+ 173   3            else
+ 174   3            {
+ 175   4              Ctl.Tim.u16BrankwaitNms = BREAK_DOWNWALTNMS;
+ 176   4      
+ 177   4              if(BREAK_VALUE == 32767)
+C51 COMPILER V9.52.0.0   MC_MOTORCOTROL_LAYER                                              08/07/2017 14:18:18 PAGE 4   
+
+ 178   4              {
+ 179   5                PWM_BREAK;
+ 180   5              }
+ 181   4              else
+ 182   4              {
+ 183   5                PWM_ULVLWL_PWM;
+ 184   5              }
+ 185   4      
+ 186   4              if(Ctl.Start == FALSE) 
+ 187   4              {
+ 188   5                Ctl.State = MOTOR_STOP;
+ 189   5                PWMINCtl.PWMINIdle = TRUE;
+ 190   5              }
+ 191   4              else
+ 192   4              {
+ 193   5                PWMOUT_OFF;
+ 194   5                
+ 195   5                Ctl.State =  MOTOR_READY;
+ 196   5                DRV_OE_ON;
+ 197   5              }
+ 198   4            }      
+ 199   3          }
+ 200   2        }
+ 201   1        
+ 202   1        return 1;
+ 203   1      }
+ 204          
+ 205          /*******************************************************************************
+ 206          * Function Name  : MCL_Ready
+ 207          * Description    : 
+ 208          * Input          : None
+ 209          * Output         : None
+ 210          * Return         : 1
+ 211          *******************************************************************************/
+ 212          u8 MCL_Ready(void)
+ 213          {  
+ 214   1        MCL_ModuleDefault();
+ 215   1        Ctl.Tim.u16chargeNms = 0;
+ 216   1        
+ 217   1        #if (POSITION_FB_MODE == HALLSENSOR)         
+                Ctl.State =  MOTOR_PRECHARGE ;
+                #elif (POSITION_FB_MODE == SENSORLESS)
+ 220   1        Drv.Stk.Calcnms = 0;
+ 221   1        Ctl.State =  MOTOR_STRACK ;
+ 222   1        #endif
+ 223   1        if(Ctl.Start == FALSE)   {
+ 224   2          Ctl.State = MOTOR_STOP;
+ 225   2          PWMINCtl.PWMINIdle = TRUE;
+ 226   2        }
+ 227   1           
+ 228   1        return 1;
+ 229   1      }
+ 230          
+ 231          /*******************************************************************************
+ 232          * Function Name  : MCL_Strack
+ 233          * Description    : 
+ 234          * Input          : None
+ 235          * Output         : None
+ 236          * Return         : 1
+ 237          *******************************************************************************/
+ 238          u8 MCL_Strack(void)
+ 239          {
+C51 COMPILER V9.52.0.0   MC_MOTORCOTROL_LAYER                                              08/07/2017 14:18:18 PAGE 5   
+
+ 240   1        PWMOUT_OFF; 
+ 241   1        Drv.PWM.Dutytarget = 1;                 //充电占空比
+ 242   1        Drv.PWM.DutyCurrent = Drv.PWM.Dutytarget;
+ 243   1        
+ 244   1        Drv_BemfPhaseChoice(7);                 //检测UVW反电势
+ 245   1      
+ 246   1        #if (WAIT_STEP == WAIT_STRACK)          //调试模式
+                Drv.Stk.Calcnms = 0;
+                #endif
+ 249   1      
+ 250   1        #if(BEMFSETFR)                          //方向设定
+                Drv_BemfSetFRFun();
+                #endif
+ 253   1      
+ 254   1        if(Drv.Stk.Calcnms < STKNMS)
+ 255   1        { 
+ 256   2          if(Drv.Stk.BemfFR!=0xFF)
+ 257   2          {
+ 258   3            if(Ctl.direction == Drv.Stk.BemfFR)
+ 259   3            {
+ 260   4              Drv_BemfPhaseChoice(0);
+ 261   4      
+ 262   4              if(Ctl.direction == CW)
+ 263   4              {
+ 264   5                if(Drv.Stk.BemfTabB<6)
+ 265   5                {
+ 266   6                  Drv.Stk.BemfTabB +=1;
+ 267   6                }
+ 268   5                else 
+ 269   5                {
+ 270   6                  Drv.Stk.BemfTabB = 1;
+ 271   6                }
+ 272   5              }
+ 273   4              Ctl.Step = Drv.Stk.BemfTabB;
+ 274   4              
+ 275   4              Drv_BemfPhaseChoice(Ctl.Step);//7  
+ 276   4              Drv.PWM.Dutytarget = Ctl.Ramp.cpDutyEnd ;                 //充电占空比
+ 277   4              Drv.PWM.DutyCurrent = Drv.PWM.Dutytarget;
+ 278   4              pid_spd.Out = Ctl.Ramp.cpDutyEnd;
+ 279   4              
+ 280   4              Ctl.State = MOTOR_NORMAL;
+ 281   4            }
+ 282   3            else if(Drv.Stk.BemfFR == 0x7F) 
+ 283   3            {
+ 284   4              #if (STRACK_EN == 2)
+ 285   4              Ctl.FnStopmodeC = FREE_DOWN;
+ 286   4              #endif
+ 287   4              Ctl.State = MOTOR_PRECHARGE;
+ 288   4            }  
+ 289   3            else
+ 290   3            {     
+ 291   4              #if (STRACK_EN == 2)
+ 292   4              Ctl.State = MOTOR_STOP;
+ 293   4              PWMINCtl.PWMINIdle = TRUE;
+ 294   4              Ctl.FnStopmodeC = BREAK_DOWN;
+ 295   4              #endif
+ 296   4            }
+ 297   3          } 
+ 298   2        }
+ 299   1        else
+ 300   1        {
+ 301   2          #if (STRACK_EN == 2)
+C51 COMPILER V9.52.0.0   MC_MOTORCOTROL_LAYER                                              08/07/2017 14:18:18 PAGE 6   
+
+ 302   2          Ctl.FnStopmodeC = FREE_DOWN;
+ 303   2          #endif
+ 304   2          Ctl.State = MOTOR_PRECHARGE;
+ 305   2        }
+ 306   1      
+ 307   1        if(Ctl.Start == FALSE) 
+ 308   1        {
+ 309   2          Ctl.State = MOTOR_STOP;
+ 310   2          PWMINCtl.PWMINIdle = TRUE;
+ 311   2        }
+ 312   1      
+ 313   1        return 1;
+ 314   1      }
+ 315          
+ 316          /*******************************************************************************
+ 317          * Function Name  : MCL_Precharge
+ 318          * Description    : 
+ 319          * Input          : None
+ 320          * Output         : None
+ 321          * Return         : 1
+ 322          *******************************************************************************/
+ 323          u8 MCL_Precharge(void)
+ 324          {
+ 325   1        if(Ctl.Tim.u16chargeNms < CHARGENMS)            // 100ms 测试101ms
+ 326   1        {
+ 327   2          Drv.PWM.Dutytarget = CHARGEDUTY;                 //充电占空比
+ 328   2          Drv.PWM.DutyCurrent = Drv.PWM.Dutytarget;
+ 329   2          Drv.PWM.u16cycle = Fu68xx_PWM_Update(Drv.PWM.DutyCurrent);  //占空比给定
+ 330   2          PWM_UL_ON;
+ 331   2        }
+ 332   1        else if(Ctl.Tim.u16chargeNms < CHARGENMS*2)     // 100ms 测试101ms
+ 333   1        {
+ 334   2          PWM_VL_ON;  //PWM_ULVL_ON
+ 335   2        }
+ 336   1        else if(Ctl.Tim.u16chargeNms < CHARGENMS*3)     // 100ms 测试101ms
+ 337   1        {
+ 338   2          PWM_WL_ON; //PWM_ULVLWL_ON
+ 339   2        }
+ 340   1        else
+ 341   1        {
+ 342   2          PWMOUT_OFF;                                    //
+ 343   2          #if (POSITION_FB_MODE == HALLSENSOR )         //HALLSENSOR
+                  Drv.Hall.Status = Hall_IRQHandler();           //hall读取
+              
+                  Drv.PWM.Dutytarget = MOTOR_INIT_DUTY;                 //充电占空比    //初始占空比
+                  Drv.PWM.DutyCurrent = Drv.PWM.Dutytarget;
+                  Drv.PWM.u16cycle = Fu68xx_PWM_Update(Drv.PWM.DutyCurrent);  //占空比给定
+                  TIM2_DR = 0;
+                  Ctl.Tim.STAnms = 0;
+                  Ctl.spd.refTar = SPEED_REF_TAR;
+                  Ctl.spd.refCur = SPEED_REF_INIT; 
+                  pid_spd.Out = 0;
+              
+                  #if (HALLADVANCEEANGLE == 0)
+                  Drv_HallDriveD(Ctl.Step);
+                  #else
+                  Drv_HallDriveS(Ctl.Step);    
+                  #endif
+                  Ctl.State = MOTOR_NORMAL;                          
+              
+                  #elif (POSITION_FB_MODE == SENSORLESS)
+ 363   2          
+C51 COMPILER V9.52.0.0   MC_MOTORCOTROL_LAYER                                              08/07/2017 14:18:18 PAGE 7   
+
+ 364   2          Drv.PWM.Dutytarget = RAMP_DUTY_END;                 //充电占空比    //初始占空比
+ 365   2          Drv.PWM.DutyCurrent = Drv.PWM.Dutytarget;
+ 366   2      
+ 367   2          Ctl.Alig.NmsCount = 0;
+ 368   2          Ctl.State = MOTOR_ALIGNMENGT; 
+ 369   2      
+ 370   2          Drv.PWM.Dutytarget = Ctl.Alig.duty;
+ 371   2          Drv.PWM.DutyCurrent = Drv.PWM.Dutytarget; 
+ 372   2          Drv.PWM.u16cycle = Fu68xx_PWM_Update(Drv.PWM.DutyCurrent);  //占空比给定
+ 373   2        
+ 374   2          #endif
+ 375   2        }
+ 376   1      
+ 377   1        if(Ctl.Start == FALSE)
+ 378   1        {
+ 379   2          Ctl.State = MOTOR_STOP;
+ 380   2          PWMINCtl.PWMINIdle = TRUE;
+ 381   2        }    
+ 382   1        
+ 383   1        return 1;
+ 384   1      }
+ 385          
+ 386          /*******************************************************************************
+ 387          * Function Name  : MCL_Alignment
+ 388          * Description    : 
+ 389          * Input          : None
+ 390          * Output         : None
+ 391          * Return         : 1
+ 392          *******************************************************************************/
+ 393          u8 MCL_Alignment(void)
+ 394          {
+ 395   1        if(Ctl.Alig.NmsCount < Ctl.Alig.timNms)     // 1000ms 
+ 396   1        {
+ 397   2          //AH->BL,CL    U->V/W
+ 398   2          PWM_UHVLWL_PWM;
+ 399   2          Drv.PWM.Dutytarget = Ctl.Alig.duty;
+ 400   2          Drv.PWM.DutyCurrent = Drv.PWM.Dutytarget; 
+ 401   2          Drv.PWM.u16cycle = Fu68xx_PWM_Update(Drv.PWM.DutyCurrent);  //占空比给定
+ 402   2        }
+ 403   1        else
+ 404   1        {
+ 405   2          PWMOUT_OFF;
+ 406   2          Drv_BemfPhaseChoice(0);
+ 407   2          
+ 408   2          Drv.PWM.Dutytarget = Ctl.Ramp.cpDutySta;
+ 409   2          Drv.PWM.DutyCurrent = Ctl.Ramp.cpDutySta; 
+ 410   2          
+ 411   2          if (Ctl.direction == CW)   //U->V
+ 412   2          {
+ 413   3            Ctl.StepPre = 0;
+ 414   3            Ctl.Step = 1;          //1
+ 415   3          }
+ 416   2          else if (Ctl.direction == CCW)
+ 417   2          {                        //U->W
+ 418   3            Ctl.StepPre = 0;
+ 419   3            Ctl.Step = 2;          //2
+ 420   3          }
+ 421   2          Ctl.Ramp.cpOver = 0xFF;
+ 422   2          TIM2_ARR = RAMP_PWMARR;
+ 423   2          Ctl.State = MOTOR_OPENLOOP;
+ 424   2        }
+ 425   1        if(Ctl.Start == FALSE)
+C51 COMPILER V9.52.0.0   MC_MOTORCOTROL_LAYER                                              08/07/2017 14:18:18 PAGE 8   
+
+ 426   1        {
+ 427   2          Ctl.State = MOTOR_STOP;
+ 428   2          PWMINCtl.PWMINIdle = TRUE;
+ 429   2        }    
+ 430   1        
+ 431   1        return 1;
+ 432   1      }
+ 433          
+ 434          /*******************************************************************************
+ 435          * Function Name  : MCL_OpenLoop  RampUp
+ 436          * Description    : 
+ 437          * Input          : None
+ 438          * Output         : None
+ 439          * Return         : 1
+ 440          *******************************************************************************/
+ 441          u8 MCL_OpenLoop(void)
+ 442          {  
+ 443   1        #if (WAIT_STEP == WAIT_RAMPUP)
+                Ctl.Ramp.cpNumB = 0;
+                #endif
+ 446   1        if(Ctl.Ramp.cpOver != 0x7F)
+ 447   1        {
+ 448   2          if(Ctl.Ramp.cpNmsCount >= Ctl.Ramp.cpNms) 
+ 449   2            { 
+ 450   3              Drv_BemfPhaseChoice(0); 
+ 451   3              
+ 452   3              Ctl.Ramp.cpNmsCount = 0;
+ 453   3              
+ 454   3              if((Ctl.Ramp.cpNms - Ctl.Ramp.cptimEnd) > Ctl.Ramp.cptimstep)
+ 455   3              {
+ 456   4                Ctl.Ramp.cpNms = Ctl.Ramp.cpNms - Ctl.Ramp.cptimstep;
+ 457   4              }
+ 458   3              else if((Ctl.Ramp.cptimEnd - Ctl.Ramp.cpNms) > Ctl.Ramp.cptimstep)
+ 459   3              {
+ 460   4                Ctl.Ramp.cpNms = Ctl.Ramp.cpNms + Ctl.Ramp.cptimstep;
+ 461   4              }
+ 462   3              #if (RAMP_MODE != 3)
+ 463   3              else if(Ctl.Ramp.cpNms == Ctl.Ramp.cptimEnd)
+ 464   3              {
+ 465   4                Ctl.Ramp.cpNms = Ctl.Ramp.cptimSta;
+ 466   4              }
+ 467   3              #endif
+ 468   3              else 
+ 469   3              {
+ 470   4                Ctl.Ramp.cpNms = Ctl.Ramp.cptimEnd;
+ 471   4              }
+ 472   3      
+ 473   3              if((Drv.PWM.Dutytarget - Ctl.Ramp.cpDutyEnd) > Ctl.Ramp.cpDutystep)
+ 474   3              {
+ 475   4                Drv.PWM.Dutytarget = Drv.PWM.Dutytarget - Ctl.Ramp.cpDutystep;
+ 476   4              }      
+ 477   3              else if((Ctl.Ramp.cpDutyEnd - Drv.PWM.Dutytarget)> Ctl.Ramp.cpDutystep)
+ 478   3              {
+ 479   4                Drv.PWM.Dutytarget = Drv.PWM.Dutytarget + Ctl.Ramp.cpDutystep;
+ 480   4              }        
+ 481   3              else
+ 482   3              {
+ 483   4                Drv.PWM.Dutytarget = Ctl.Ramp.cpDutyEnd;
+ 484   4              }
+ 485   3      
+ 486   3              SetBit(TIM1_CR3,OPS0,0);               //软件写DBR触发换相
+ 487   3              
+C51 COMPILER V9.52.0.0   MC_MOTORCOTROL_LAYER                                              08/07/2017 14:18:18 PAGE 9   
+
+ 488   3              Drv_SetStep(); 
+ 489   3              Drv_Commutation(Ctl.Step);
+ 490   3              
+ 491   3              #if ((RAMP_MODE == 1)||(RAMP_MODE == 2))
+ 492   3      
+ 493   3              TIM1_BCNTR = 0;
+ 494   3              SetBit(TIM1_CR1,RCEN,0);               //失能Preload定时器 
+ 495   3              TIM1_RARR = TempRampMaskTime;
+ 496   3              TIM1_RCNTR = TIM1_RARR;
+ 497   3              CLRFlag_RUIF;
+ 498   3              Ctl.Bemf.IRQ = BEMFCMASK;              
+ 499   3              SetBit(TIM1_IER,RUIE,1);               //使能Preload定时器下溢中断
+ 500   3              SetBit(TIM1_CR1,RCEN,1);               //启动Preload定时器  
+ 501   3      
+ 502   3              #elif (RAMP_MODE == 3)
+                      Drv.speed.EventPeriod = TIM1_BCCR;
+                      TIM1_BCNTR = 0;
+                      #endif
+ 506   3              
+ 507   3              Drv_BemfPhaseChoice(0); 
+ 508   3              Ctl.Ramp.cpNumA++;                     //换相次数
+ 509   3              
+ 510   3              if(( Ctl.Ramp.cpNms == Ctl.Ramp.cptimEnd)&&(Drv.PWM.Dutytarget ==Ctl.Ramp.cpDutyEnd))
+ 511   3              {
+ 512   4                Ctl.Ramp.cpNumB ++;                 //换相次数
+ 513   4              }
+ 514   3            }
+ 515   2        }
+ 516   1      
+ 517   1        #if (RAMP_MODE == 3)
+                if(((Ctl.Ramp.cpNumB >= Ctl.Ramp.cpFinalNumB)&&(Ctl.Step==1)))  
+                { 
+                  PWMOUT_OFF;
+                  Ctl.State = MOTOR_READY; 
+                  TIM2_ARR = Drv.PWM.PwmArr;                //载波频率 = 24M/1500 =16K    
+                }
+                #endif
+ 525   1                
+ 526   1        if(Ctl.Start == FALSE)
+ 527   1        {
+ 528   2          Ctl.State = MOTOR_STOP;
+ 529   2          PWMINCtl.PWMINIdle = TRUE;
+ 530   2        }  
+ 531   1        
+ 532   1        return 1;
+ 533   1      }
+ 534          
+ 535          /*******************************************************************************
+ 536          * Function Name  : MCL_Normal
+ 537          * Description    :
+ 538          * Input          : None
+ 539          * Output         : None
+ 540          * Return         : 1
+ 541          *******************************************************************************/
+ 542          u8 MCL_Normal(void)
+ 543          { 
+ 544   1        if(Ctl.Start == FALSE)
+ 545   1        {
+ 546   2          PWMOUT_OFF;
+ 547   2          Ctl.State = MOTOR_STOP;
+ 548   2          PWMINCtl.PWMINIdle = TRUE;
+ 549   2        }  
+C51 COMPILER V9.52.0.0   MC_MOTORCOTROL_LAYER                                              08/07/2017 14:18:18 PAGE 10  
+
+ 550   1        #if(OCRESTART_EN) 
+ 551   1        if(Ctl.OC.u16Runms >= 5000)      //运行5s
+ 552   1        {
+ 553   2          Ctl.OC.u16Runms = 5000;
+ 554   2          //Ctl.OC.u8ReNum = OCRESTARTNUM;  //启动完成后，过流不再重启 20150827
+ 555   2          Ctl.OC.u8ReNum = 0;              //
+ 556   2          Ctl.OC.u16nmsCount =0;
+ 557   2        }
+ 558   1        #endif  
+ 559   1        if(Ctl.Cbcc.ReCounter >= 10000)       //1S后清除GO故障
+ 560   1        {    Ctl.Cbcc.FoCounter = 0;            //清FO故障计数器
+ 561   2          Ctl.Cbcc.ReCounter = 1000;
+ 562   2        }
+ 563   1        #if(STALLRESTART_EN) 
+ 564   1        if((Ctl.Stall.u16NormalRunms >= STANMS+500)) //运行5s         
+ 565   1          {
+ 566   2            Ctl.Stall.WaitReatartNms = 0;              //堵转重启等待时间
+ 567   2            Ctl.Stall.u16NormalRunms = STANMS+500;   //
+ 568   2            Ctl.Stall.u8Num = 0;              //清楚堵转故障 次数标记     
+ 569   2          }
+ 570   1        #endif
+ 571   1        return 1;
+ 572   1      }
+ 573          
+ 574          /*******************************************************************************
+ 575          * Function Name  : MCL_Failure
+ 576          * Description    : 
+ 577          * Input          : None
+ 578          * Output         : None
+ 579          * Return         : 1
+ 580          *******************************************************************************/
+ 581          u8 MCL_Failure(void)
+ 582          {
+ 583   1        PWMOUT_OFF;
+ 584   1        DRV_OE_OFF;             //
+ 585   1        Ctl.Start = FALSE;
+ 586   1        PWMINCtl.PWMINIdle = TRUE;
+ 587   1        
+ 588   1      //-------------------------------------------------------  
+ 589   1      //故障记录    
+ 590   1        #if(FAILLOGEN)
+ 591   1        if(Ctl.E_message.ErrorF==0)
+ 592   1        {
+ 593   2          //故障信息记录
+ 594   2          Ctl.E_message.ErrorF   = 1 ;
+ 595   2          Ctl.E_message.SysError = Ctl.SysError;
+ 596   2          //Ctl.E_message.State  = Ctl.State ;
+ 597   2          Ctl.E_message.FR       = Uc.flg.FR;
+ 598   2          //Ctl.E_message.SpeedRef = pid_spd.Ref;
+ 599   2          Ctl.E_message.SpeedFdb = Drv.speed.SpeedRpm;
+ 600   2          Ctl.E_message.Duty     = Drv.PWM.DutyCurrent;
+ 601   2          Ctl.E_message.ImeasBus = Drv.AdcMeas.ImeasBus;
+ 602   2          Ctl.E_message.VdcMeas = Drv.AdcMeas.VdcMeas;
+ 603   2          Ctl.E_message.Ibus     = Drv.AdcMeas.Ibus;
+ 604   2          Ctl.E_message.Vdc      = Drv.AdcMeas.Vdc;
+ 605   2      //-------------------------------------------------------  
+ 606   2      //故障信息flash 存储。
+ 607   2          #if(FAILSTOREEN)
+                  if((Ctl.SysError != E_OV)&&(Ctl.SysError != E_UV))       
+                      ;//Flash_Save_Data();
+                  #endif
+ 611   2      //------------------------------------------------------- 
+C51 COMPILER V9.52.0.0   MC_MOTORCOTROL_LAYER                                              08/07/2017 14:18:18 PAGE 11  
+
+ 612   2      //故障上报        
+ 613   2        }
+ 614   1        #endif
+ 615   1      //-------------------------------------------------------
+ 616   1      //故障重启
+ 617   1        #if(VBUSRECOVER_EN)
+                if((Ctl.SysError == E_OV)||(Ctl.SysError == E_UV))
+                {
+                  if(Ctl.Tim.Nonms>=NONMS)
+                  {
+                    Mcl_MotorRestart();
+                  }
+                }
+                #endif
+ 626   1      //-------------------------------------------------------
+ 627   1        #if(OCRESTART_EN)  
+ 628   1        if((Ctl.SysError == E_OC)||(Ctl.SysError == E_FAIL))
+ 629   1        //if(Ctl.SysError == E_OC)
+ 630   1        {
+ 631   2          if(Ctl.OC.ReFlag == 0)
+ 632   2          {
+ 633   3            if(Ctl.OC.u8ReNum < OCRESTARTNUM)
+ 634   3            {
+ 635   4              Ctl.OC.u8ReNum ++;
+ 636   4              Ctl.OC.u16nmsCount = 0;  
+ 637   4              Ctl.OC.ReFlag = 1;
+ 638   4            }
+ 639   3          }
+ 640   2          if(Ctl.OC.ReFlag == 1)
+ 641   2          {
+ 642   3            if(Ctl.OC.u16nmsCount >= OCRESTARTTIM)
+ 643   3            {
+ 644   4              Ctl.OC.ReFlag = 0;
+ 645   4              Mcl_MotorRestart();
+ 646   4            }
+ 647   3          }
+ 648   2        }
+ 649   1        #endif
+ 650   1          
+ 651   1      //-------------------------------------------------------
+ 652   1        #if(STALLRESTART_EN)
+ 653   1        if((Ctl.SysError == E_STA)||(Ctl.SysError == E_STB3)||(Ctl.SysError == E_STB2)||((Ctl.SysError == E_STB1
+             -)))
+ 654   1          {
+ 655   2            if(Ctl.Stall.u8FL == 0)
+ 656   2              {
+ 657   3                if(Ctl.Stall.WaitReatartNms >= STALLRESTARTTIM)
+ 658   3                  {
+ 659   4                    Ctl.Stall.WaitReatartNms = 0;
+ 660   4                    Mcl_StallRestart(); 
+ 661   4                  }
+ 662   3              }
+ 663   2          }
+ 664   1        #endif
+ 665   1          
+ 666   1      //-------------------------------------------------------
+ 667   1        #if(OHRE_EN)
+                if((Ctl.SysError == E_OH1)||(Ctl.SysError == E_OH2)||(Ctl.SysError == E_OH3))
+                {
+                  if((Ctl.Tim.OH1REnms>=OH1NMS)&&((Ctl.Tim.OH2REnms>=OH2NMS)))
+                  {
+                    Mcl_MotorRestart();
+C51 COMPILER V9.52.0.0   MC_MOTORCOTROL_LAYER                                              08/07/2017 14:18:18 PAGE 12  
+
+                  }
+                }
+                #endif
+ 676   1        return 1;
+ 677   1      }
+ 678          
+ 679          /*******************************************************************************
+ 680          * Function Name  : MCL_BKIN_IRQHandler
+ 681          * Description    : 
+ 682          * Input          : break input
+ 683          * Output         : None
+ 684          * Return         : 
+ 685          *******************************************************************************/
+ 686          void MCL_BKIN_IRQHandler(void)
+ 687          {
+ 688   1        #if (CBCCP_EN == 0)
+ 689   1          DRV_OE_OFF;
+ 690   1          Ctl.SysError = E_FAIL;
+ 691   1          Ctl.State = MOTOR_FAILURE;    
+ 692   1        #elif (CBCCP_EN == 1)
+                  Ctl.Cbcc.FoCounter++;
+                  Ctl.Cbcc.ReCounter = 0;  //FO信号后重新计数
+                  if(Ctl.Cbcc.FoCounter >= CBCCP_NUM)
+                  {
+                    DRV_OE_OFF;
+                    Ctl.SysError = E_FAIL;
+                    Ctl.State = MOTOR_FAILURE;  
+                  }
+                #elif (CBCCP_EN == 2)
+                  ;
+                #else
+                  DRV_OE_OFF;
+                  Ctl.SysError = E_FAIL;
+                  Ctl.State = MOTOR_FAILURE;   
+                #endif
+ 708   1            
+ 709   1        #if(FAILLOGEN)
+ 710   1        if(Ctl.E_message.State == 0)
+ 711   1        {
+ 712   2          Ctl.E_message.State = Ctl.State; 
+ 713   2        }
+ 714   1        #endif  
+ 715   1      }
+ 716          /*******************************************************************************
+ 717          * Function Name  : MainISR
+ 718          * Description    : 斩波中断执行，用于同步PWM计算 速度闭环，电流闭环
+ 719          * Input          : 
+ 720          * Output         : 
+ 721          * Return         : 1
+ 722          *******************************************************************************/
+ 723          void MainISR(void)
+ 724          {
+ 725   1        Ctl.gIsrTicker++;
+ 726   1        Ctl.counterCtrl++;
+ 727   1        Ctl.counterSpeed++;
+ 728   1        Ctl.counterCurrent++;
+ 729   1      
+ 730   1        #if(CBCCP_EN)
+                  #if (EFAL == FO_CMP)
+                  DRV_OE_ON ; 
+                  #else
+                  if(FO == 1)
+C51 COMPILER V9.52.0.0   MC_MOTORCOTROL_LAYER                                              08/07/2017 14:18:18 PAGE 13  
+
+                  {
+                    DRV_OE_ON ; 
+                  }
+                  #endif
+                #endif
+ 740   1      
+ 741   1        if(Ctl.gIsrTicker >= 10)
+ 742   1        {
+ 743   2          Ctl.gIsrTicker = 0;
+ 744   2          SysTick_1ms();
+ 745   2        }
+ 746   1        else if(Ctl.gIsrTicker == 1)
+ 747   1        {
+ 748   2          if(Ctl.PowerOn == 0X7f)
+ 749   2          {
+ 750   3            MCL_ChkSysStage();          //故障报警
+ 751   3          }
+ 752   2        }
+ 753   1        else if(Ctl.gIsrTicker == 2) 
+ 754   1        {
+ 755   2          if(Ctl.PowerOn == 0X7f)
+ 756   2          {
+ 757   3            MCL_ChkPowerStage();       //故障检测
+ 758   3          }
+ 759   2        }
+ 760   1        else if(Ctl.gIsrTicker == 3)
+ 761   1        {
+ 762   2          #if (SPEED_CALC_EN >= 1) 
+                  MDUControl.FlagCalcSpeed = 0x7F;                            //转速计算请求
+                  #endif
+ 765   2        }
+ 766   1      
+ 767   1        #if(SPEED_CLOSE_EN)
+                Ctl.spd.refCur = Drv_SpeedRampCale(Ctl.spd.refTar);         //速度闭环加减速曲线  
+                #elif(CURRENT_CLOSE_EN)
+                ;//                                                         //电流给定
+                #else
+ 772   1        Drv.PWM.DutyCurrent = Drv_DutyRampCale(Drv.PWM.Dutytarget); //速度开环加减速曲线
+ 773   1        #endif
+ 774   1        
+ 775   1        #if(SPEED_CLOSE_EN)                       //速度环
+                if(Ctl.counterSpeed > Ctl.numTicksPerSpeed)
+                {
+                  Ctl.counterSpeed = 0;
+                  if(Ctl.State == MOTOR_NORMAL)
+                  {
+                    pid_spd.Ref = Ctl.spd.refCur;          //REF
+                    pid_spd.Fdb = Drv.speed.Speed;         //FDB
+                    #if(CURRENT_CLOSE_EN)
+                    Ctl.Is.refTar = Pid_calc(&pid_spd);    //速度环输出
+                    pid_is.Ref = Ctl.Is.refTar;            //电流环输入
+                    #else
+                    Drv.PWM.DutyCurrent = Pid_calc(&pid_spd);
+                    #endif
+                  }
+                }
+                #elif(CURRENT_CLOSE_EN)                    //电流环
+                pid_is.Ref = Ctl.Is.refTar;                //电流环输入
+                #endif
+ 794   1      
+ 795   1        #if(CURRENT_CLOSE_EN)
+                if(Ctl.counterCurrent > Ctl.numTicksPerCurrent)
+C51 COMPILER V9.52.0.0   MC_MOTORCOTROL_LAYER                                              08/07/2017 14:18:18 PAGE 14  
+
+                {
+                  Ctl.counterCurrent = 0;
+                  if(Ctl.State == MOTOR_NORMAL)
+                  {
+                    if(pid_is.Ref > CURRENT_INMAX)
+                    {
+                      pid_is.Ref = CURRENT_INMAX;
+                    }
+                    pid_is.Fdb = Drv.AdcMeas.ImeasBus;
+                    Drv.PWM.DutyCurrent = Pid_calc(&pid_is); //电流环输出
+                  }
+                }
+                #endif
+ 810   1      
+ 811   1        #if(CURRENT_LIMIT_EN)
+                {
+                  if(Drv.AdcMeas.ImeasBus >  Drv.PWM.DutyLimitMaxRef)
+                  {
+                    Drv.PWM.DutyLimitFlag = 0x7F;
+                  }
+                  else
+                  {
+                    Drv.PWM.DutyLimitFlag = 0xFF;
+                  }
+                }
+                #endif
+ 823   1      
+ 824   1        Drv.PWM.u16cycle = Fu68xx_PWM_Update(Drv.PWM.DutyCurrent);  //占空比给定
+ 825   1        
+ 826   1      }
+ 827          
+ 828          /*******************************************************************************
+ 829          * Function Name  : MCL_ChkSysStage
+ 830          * Description    : 1ms时钟 计时器
+ 831          * Input          : 
+ 832          * Output         : 
+ 833          * Return         : 1
+ 834          *******************************************************************************/
+ 835          void MCL_ChkSysStage(void)  
+ 836          {
+ 837   1      
+ 838   1        if(Ctl.State == MOTOR_NORMAL)
+ 839   1        {
+ 840   2          #if(OVERLOAD_EN)
+                  if(Ctl.OL.Value != 0x7F)        //过载
+                  {
+                    Ctl.SysError = E_OL;
+                  }
+                  #endif 
+ 846   2        }
+ 847   1        #if(OVERCURRENT_EN)
+                if(Ctl.Tim.OCnms >= OCNMS)      //过流
+                {
+                  Ctl.SysError = E_OC;
+                }
+                #endif
+ 853   1        #if(OVERVOLTAGE_EN)           
+                if(Ctl.Tim.OVnms >= OVNMS)      //过压
+                {
+                  Ctl.SysError = E_OV;
+                }
+                #endif
+C51 COMPILER V9.52.0.0   MC_MOTORCOTROL_LAYER                                              08/07/2017 14:18:18 PAGE 15  
+
+ 859   1      
+ 860   1        #if(UNDERVOLTAGE_EN)            //欠压
+                if(Ctl.Tim.UVnms >= UVNMS)
+                {
+                  Ctl.SysError = E_UV;
+                }  
+                #endif  
+ 866   1        
+ 867   1        #if(STA_EN)                     //堵转
+ 868   1        if(Ctl.Tim.STAnms >= STANMS)
+ 869   1        {
+ 870   2          Ctl.SysError = E_STA; 
+ 871   2        }
+ 872   1        #endif
+ 873   1        #if(STB1_EN)                    //失速1
+ 874   1        if(Ctl.Tim.STB1nms >= STB1NMS)
+ 875   1        {
+ 876   2          Ctl.SysError = E_STB1;
+ 877   2        }
+ 878   1        #endif
+ 879   1        #if(STB2_EN)                    //失速2
+ 880   1        if(Ctl.Tim.STB2nms >= STB2NMS)
+ 881   1        {
+ 882   2          Ctl.SysError = E_STB2;
+ 883   2        }
+ 884   1        #endif
+ 885   1        #if(OH1_EN)                     //过热
+                if(Ctl.Tim.OH1nms >= OH1NMS)
+                {
+                  Ctl.SysError = E_OH1;
+                  Ctl.Tim.OH1nms = OH1NMS;
+                }
+                #endif
+ 892   1        #if(OH2_EN)                     //过热
+                if(Ctl.Tim.OH2nms >= OH2NMS)
+                {
+                  Ctl.SysError = E_OH2;
+                  Ctl.Tim.OH2nms = OH2NMS;
+                }
+                #endif
+ 899   1      
+ 900   1        #if (POSITION_FB_MODE == HALLSENSOR)
+                if((Drv.Hall.Section == 0x7F)||(Drv.Hall.Section == 0xFF))
+                {
+                  Ctl.SysError = E_HALL;
+                }
+                #endif
+ 906   1      
+ 907   1        if (Ctl.SysError!=NONE)
+ 908   1        {
+ 909   2          PWMOUT_OFF;
+ 910   2          DRV_OE_OFF;
+ 911   2      
+ 912   2          #if(FAILSTOREEN)
+                  if(Ctl.E_message.State == 0)
+                  {
+                   Ctl.E_message.State = Ctl.State;
+                  }
+                  #endif
+ 918   2          Ctl.State = MOTOR_FAILURE;
+ 919   2        }
+ 920   1      }
+C51 COMPILER V9.52.0.0   MC_MOTORCOTROL_LAYER                                              08/07/2017 14:18:18 PAGE 16  
+
+ 921          
+ 922          /*******************************************************************************
+ 923          * Function Name  : MCL_ChkPowerStage
+ 924          * Description    : 1ms时钟 计时器
+ 925          * Input          : 
+ 926          * Output         : 
+ 927          * Return         : 1
+ 928          *******************************************************************************/
+ 929          void MCL_ChkPowerStage(void)  
+ 930          {
+ 931   1        //_nop_();
+ 932   1        if(Ctl.State == MOTOR_NORMAL)
+ 933   1        {
+ 934   2          #if(OCRESTART_EN)
+ 935   2          Ctl.OC.u16Runms++;
+ 936   2          #endif
+ 937   2          Ctl.Tim.STAnms++;                   //堵转计时器
+ 938   2          Ctl.Stall.u16NormalRunms++;
+ 939   2      
+ 940   2          //堵转检测
+ 941   2          #if(STB1_EN) 
+ 942   2          if(Drv.speed.EventPeriod < STB1SPEEDVALUE)
+ 943   2          {
+ 944   3            Ctl.Tim.STB1nms++;
+ 945   3          }
+ 946   2          else
+ 947   2          {
+ 948   3            Ctl.Tim.STB1nms= 0;
+ 949   3          }
+ 950   2          #endif
+ 951   2      
+ 952   2          #if(STB2_EN) 
+ 953   2          if(Drv.speed.EventPeriod > STB2SPEEDVALUE)
+ 954   2          {
+ 955   3            Ctl.Tim.STB2nms++;
+ 956   3          }
+ 957   2          else
+ 958   2          {
+ 959   3            Ctl.Tim.STB2nms = 0;
+ 960   3          }
+ 961   2          #endif
+ 962   2        }
+ 963   1        else
+ 964   1        {
+ 965   2         Ctl.Section.Counter = 0;
+ 966   2         Ctl.Stall.u16NormalRunms = 0;
+ 967   2       }
+ 968   1      //------------------------------------------
+ 969   1      //过温检测
+ 970   1        #if(OH1_EN)
+                if(Drv.AdcMeas.Therm1 >= 100.0)       // (~120)
+                {
+                  Ctl.Tim.OH1nms++;  //
+                  Ctl.Tim.OH1REnms = 0;
+                }
+                else if(Drv.AdcMeas.Therm1 <= 90.0)   //  (80~120)
+                {
+                  Ctl.Tim.OH1REnms++;
+                  
+                  Ctl.Tim.OH1nms--;
+                  if(Ctl.Tim.OH1nms < 0)
+                  {
+C51 COMPILER V9.52.0.0   MC_MOTORCOTROL_LAYER                                              08/07/2017 14:18:18 PAGE 17  
+
+                    Ctl.Tim.OH1nms = 0;
+                  }
+                } 
+                else                                  //  (~80)
+                {
+                  Ctl.Tim.OH1REnms++;
+                 
+                  Ctl.Tim.OH1nms--;
+                  if(Ctl.Tim.OH1nms<0)
+                  {
+                    Ctl.Tim.OH1nms = 0;
+                  }
+                }     
+                #endif
+ 997   1        
+ 998   1        #if(OH2_EN)
+                if(Drv.AdcMeas.Therm2 >= 100.0)       // (~120)
+                  {
+                    Ctl.Tim.OH2nms++;  //
+                    Ctl.Tim.OH2REnms = 0;
+                  }
+                else if(Drv.AdcMeas.Therm2 <= 80.0)   //  (80~120)
+                  {
+                    Ctl.Tim.OH2REnms++;
+                    
+                    Ctl.Tim.OH2nms--;
+                    if(Ctl.Tim.OH2nms < 0)
+                    {
+                      Ctl.Tim.OH2nms = 0;
+                    }
+                  } 
+                else                                  //  (~80)
+                {
+                    Ctl.Tim.OH2REnms++;
+                   
+                    Ctl.Tim.OH2nms--;
+                    if(Ctl.Tim.OH2nms<0)
+                    {
+                      Ctl.Tim.OH2nms = 0;
+                    }
+                }     
+                #endif        
+1025   1      //------------------------------------------
+1026   1      //过流检测
+1027   1        #if (CBCCP_EN != 0)
+                Ctl.Cbcc.ReCounter++; 
+                #endif   
+1030   1        #if(OVERCURRENT_EN)
+                if(Drv.AdcMeas.ImeasBus > MECASEOVERCURRENT)
+                  {
+                    Ctl.Tim.OCnms++;
+                  }
+                else
+                  {
+                    Ctl.Tim.OCnms--;
+                    if(Ctl.Tim.OCnms<0)
+                    {
+                      Ctl.Tim.OCnms = 0; 
+                    }
+                  }    
+                #endif  
+1044   1        #if(NOLOAD_EN)  
+C51 COMPILER V9.52.0.0   MC_MOTORCOTROL_LAYER                                              08/07/2017 14:18:18 PAGE 18  
+
+1045   1        if(Drv.AdcMeas.ImeasBus < MECASENOLOADCURRENT)        //
+1046   1          {
+1047   2            Ctl.Noload.Counter++;
+1048   2          }
+1049   1        else
+1050   1          {
+1051   2            Ctl.Noload.Counter--;
+1052   2            if(Ctl.Noload.Counter<0)
+1053   2            {
+1054   3              Ctl.Noload.Counter = 0; 
+1055   3            }
+1056   2          }
+1057   1       #endif      
+1058   1      //------------------------------------------
+1059   1      //过压欠压检测
+1060   1        #if((OVERVOLTAGE_EN)||(UNDERVOLTAGE_EN)||(VBUSRECOVER_EN))
+                if(Drv.AdcMeas.VdcMeas != 0)             
+                {
+                  if(Drv.AdcMeas.VdcMeas > MECASEOVERVOLTAGE)
+                  {
+                    Ctl.Tim.OVnms++;
+                    Ctl.Tim.UVnms = 0;
+                    Ctl.Tim.Nonms = 0;
+                  }
+                  else if (Drv.AdcMeas.VdcMeas < MECASEUNDERVOLTAGE)
+                  {
+                    Ctl.Tim.OVnms = 0;
+                    Ctl.Tim.UVnms++;
+                    Ctl.Tim.Nonms = 0;
+                  }
+                  else if ((Drv.AdcMeas.VdcMeas < MECASEOVREERVOLTAGE)&&(Drv.AdcMeas.VdcMeas > MECASEUNREDERVOLTAGE))
+                  {
+                    Ctl.Tim.OVnms = 0;
+                    Ctl.Tim.UVnms = 0;
+                    Ctl.Tim.Nonms++;
+                  }      
+                }
+                #endif
+1083   1      }
+1084          /*******************************************************************************
+1085          * Function Name  : SysTick_1ms
+1086          * Description    : 1ms时钟 计时器
+1087          * Input          : 
+1088          * Output         : 
+1089          * Return         : 1
+1090          *******************************************************************************/
+1091          void SysTick_1ms(void)
+1092          {  
+1093   1        #if(FAILLAMPEN)
+1094   1        Ctl.Tim.LED_msCunter++;
+1095   1        Ctl.Tim.LED_OnOffms++;              //故障指示led闪烁
+1096   1        #endif
+1097   1        
+1098   1        if(Ctl.FnStopmodeC == BREAK_DOWN)
+1099   1        {
+1100   2          if(Ctl.State == MOTOR_STOP)
+1101   2          {
+1102   3            Ctl.Tim.u16BrankwaitNms++;        //刹车等待定时器
+1103   3          }
+1104   2          else
+1105   2          {
+1106   3            Ctl.Tim.u16BrankwaitNms = 0;      //刹车等待定时器
+C51 COMPILER V9.52.0.0   MC_MOTORCOTROL_LAYER                                              08/07/2017 14:18:18 PAGE 19  
+
+1107   3          }    
+1108   2        }
+1109   1      
+1110   1        if(Ctl.PowerOn == 0X7f)
+1111   1        {
+1112   2          Ctl.Tim.u16chargeNms++;             //充电定时器 
+1113   2          Ctl.Tim.OnOffnms++;                 //ONOFF定时器
+1114   2      
+1115   2          #if (POSITION_FB_MODE == SENSORLESS)
+1116   2          Ctl.Alig.NmsCount++;                //定位定时器
+1117   2          Ctl.Ramp.cpNmsCount++;              //换相定时器
+1118   2          Drv.Stk.Calcnms++;
+1119   2          #endif
+1120   2          
+1121   2          #if(LAMP_EN)
+                  Ctl.Tim.NoOperationDelaynms++;      //无操作延时定时器
+                  #endif
+1124   2          Ctl.Stall.WaitReatartNms++;
+1125   2          #if(OVERLOAD_EN)
+                  Ctl.OL.msFlag = 0x7F;               //过载保护
+                  #endif
+1128   2          #if(OCRESTART_EN) 
+1129   2          Ctl.OC.u16nmsCount++;               //过载保护重启等待时间
+1130   2          #endif
+1131   2          #if(NOLOAD_EN)
+1132   2          if(Drv.AdcMeas.ImeasBus > MECASENOLOADCURRENT)
+1133   2          {
+1134   3            Ctl.Tim.NOloadCounter++;
+1135   3          }
+1136   2          else
+1137   2          {
+1138   3            Ctl.Tim.NOloadCounter--;
+1139   3          }
+1140   2          #endif
+1141   2        }
+1142   1        else
+1143   1        {
+1144   2          Ctl.Tim.u16PowerOnNms++;            //上电定时器
+1145   2        }
+1146   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2454    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =    317       1
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

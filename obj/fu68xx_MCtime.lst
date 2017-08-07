@@ -1,0 +1,411 @@
+C51 COMPILER V9.52.0.0   FU68XX_MCTIME                                                     08/07/2017 14:18:21 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE FU68XX_MCTIME
+OBJECT MODULE PLACED IN .\obj\fu68xx_MCtime.obj
+COMPILER INVOKED BY: C:\Keil_v4\C51\BIN\C51.EXE User\Source\fu68xx_MCtime.c LARGE OMF2 WARNINGLEVEL(0) OPTIMIZE(SIZE) BR
+                    -OWSE NOAREGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\fu68xx_MCtime.lst) TABS(2) OBJECT(.\obj\fu68xx_M
+                    -Ctime.obj)
+
+line level    source
+
+   1          
+   2          /************************ (C) COPYRIGHT 2015 FT *******************************
+   3          * File Name          : 
+   4          * Author             : Application Team  Tom.wang 
+   5          * Version            : V2.0.0
+   6          * Date               : 06/15/2015
+   7          * Description        : 
+   8          ********************************************************************************
+   9          /*******************************************************************************
+  10          * All Rights Reserved
+  11          *******************************************************************************/
+  12          
+  13          /* Includes ------------------------------------------------------------------*/
+  14          #include <FU68xx.h>
+  15          #include "sys_conf.h" 
+  16          #include "fu68xx_MCtime.h"
+  17          /* Private typedef -----------------------------------------------------------*/
+  18          /* Private define ------------------------------------------------------------*/
+  19          /* Private macro -------------------------------------------------------------*/
+  20          /* Private variables ---------------------------------------------------------*/
+  21          /* Private function prototypes -----------------------------------------------*/
+  22          /* Private functions ---------------------------------------------------------*/
+  23          
+  24          /*******************************************************************************
+  25          * Function Name  : TIM1_Config
+  26          * Description    : Main program.
+  27          * Input          : None
+  28          * Output         : None
+  29          * Return         : None
+  30          *******************************************************************************/
+  31          void TIM1_Config(void)
+  32          {
+  33   1        u8 temp;
+  34   1      /********************************************************************** 
+  35   1      噪声滤波使能及模式选择  
+  36   1      00;   4-machine cycle noise,4MHz
+  37   1      01;   8-machine cycle noise,2MHz
+  38   1      10    16-machine cycle noise,1MHz 
+  39   1      11;   32-machine cycle noise,0.5MHz   
+  40   1      **********************************************************************/
+  41   1      
+  42   1        SetBit(TIM1_CR2,INM00,1); 
+  43   1        SetBit(TIM1_CR2,INM01,1); 
+  44   1        SetBit(TIM1_CR2,INM10,1); 
+  45   1        SetBit(TIM1_CR2,INM11,1); 
+  46   1        SetBit(TIM1_CR2,INM20,1); 
+  47   1        SetBit(TIM1_CR2,INM21,1); 
+  48   1        
+  49   1        SetBit(TIM1_CR0,INC0,1);            /*0:禁止TI0噪声滤波,1:使能TI0噪声滤波*/ 
+  50   1        SetBit(TIM1_CR0,INC1,1);            /*0:禁止TI1噪声滤波,1:使能TI1噪声滤波*/ 
+  51   1        SetBit(TIM1_CR0,INC2,1);            /*0:禁止TI2噪声滤波,1:使能TI2噪声滤波*/ 
+  52   1      
+  53   1      /********************************************************************
+C51 COMPILER V9.52.0.0   FU68XX_MCTIME                                                     08/07/2017 14:18:21 PAGE 2   
+
+  54   1      输入信号选择
+  55   1      0: TI0--COMP0_OUT    TI1--COMP1_OUT    TI2--COMP2_OUT
+  56   1      1: TI0--P1.4_IN      TI1--P1.6_IN      TI2--P2.1_IN
+  57   1      ********************************************************************/
+  58   1        #if (POSITION_FB_MODE == HALLSENSOR)
+                  #if (HallIC == HallSensor)
+                  SetBit(TIM1_CR2,TIS,0);   //此软件没有验证 20160222
+                  #elif (HallIC == HallIC)  
+                  SetBit(TIM1_CR2,TIS,1);
+                  #endif
+                SetBit(TIM1_CR2,TIS,1);
+                #elif (POSITION_FB_MODE == SENSORLESS)
+  66   1        SetBit(TIM1_CR2,TIS,0);
+  67   1        #endif
+  68   1      /********************************************************************
+  69   1      输入极性检测
+  70   1      00:不检测边沿   01:检测上升沿   10:检测下降沿   11:检测上升/下降沿
+  71   1      ********************************************************************/
+  72   1        SetBit(TIM1_CR0,CPE1,1);
+  73   1        SetBit(TIM1_CR0,CPE0,1);
+  74   1      
+  75   1      /********************************************************************
+  76   1      边沿检测使能
+  77   1      ********************************************************************/
+  78   1        SetBit(TIM1_CR0, IEE2, 1);          // 0:禁止TI2边沿检测,1:使能TI2边沿检测
+  79   1        SetBit(TIM1_CR0, IEE1, 1);          // 0:禁止TI1边沿检测,1:使能TI1边沿检测
+  80   1        SetBit(TIM1_CR0, IEE0, 1);          // 0:禁止TI0边沿检测,1:使能TI0边沿检测
+  81   1        SetBit(TIM1_CR1, CMPE, 0);          // 0:边沿检测比较,   1:位置检测比较
+  82   1      /*CPD值设置------------------------------------------------------------------------*/
+  83   1      //  SetBit(TIM1_CR1, CPD2, 0);
+  84   1      //  SetBit(TIM1_CR1, CPD2, 0);
+  85   1      //  SetBit(TIM1_CR1, CPD2, 0);
+  86   1      /*RDA值设置------------------------------------------------------------------------*/
+  87   1      //  SetBit(TIM1_DRH, RDA2, 0);
+  88   1      //  SetBit(TIM1_DRH, RDA1, 0);
+  89   1      //  SetBit(TIM1_DRH, RDA0, 0);   
+  90   1      /********************************************************************
+  91   1      数据更新模式设置
+  92   1      000:软件写TIM1_BDBR更新TIM1_BDR
+  93   1      001:PTimer下溢触发TIM1_BDBR更新TIM1_BDR
+  94   1      010:位置检测输入触发TIM1_BDBR更新TIM1_BDR
+  95   1      011:位置检测输入启动PTimer，PTimer下溢更新TIM1_BDR
+  96   1      100:位置检测输入或者PTimer下溢更新TIM1_BDR
+  97   1      101:位置检测比较单次有效输入或PTimer单次下溢更新TIM1_BDR
+  98   1      110:位置检测比较单次有效输入触发TIM1_BDBR更新TIM1_BDR
+  99   1      111:位置检测比较单次有效输入启动PTimer，PTimer下溢更新TIM1_DBR
+ 100   1      ********************************************************************/
+ 101   1        SetBit(TIM1_CR3,OPS2,0);
+ 102   1        SetBit(TIM1_CR3,OPS1,0);
+ 103   1        SetBit(TIM1_CR3,OPS0,0);           //软件写DBR触发换相
+ 104   1      /********************************************************************
+ 105   1      PPG同步方式设置
+ 106   1      WTS = 00: 无同步，立即更新输出   
+ 107   1      WTS = 01: 上升沿同步输出   
+ 108   1      WTS = 10: 下降沿同步输出  
+ 109   1      WTS = 11: 上升/下降沿同步输出
+ 110   1      ********************************************************************/
+ 111   1        SetBit(TIM1_CR1,WTS1,0);            //无同步，立即更新输出
+ 112   1        SetBit(TIM1_CR1,WTS0,0);
+ 113   1      
+ 114   1      /********************************************************************
+ 115   1      Basic Timer & Preload Timer设置
+C51 COMPILER V9.52.0.0   FU68XX_MCTIME                                                     08/07/2017 14:18:21 PAGE 3   
+
+ 116   1      ********************************************************************/
+ 117   1        SetBit(TIM1_CR3,BCEN,0);            //停止16bit定时器
+ 118   1      
+ 119   1        #if (TIM1_PSC == TIM1PSC24M)
+ 120   1        SetBit(TIM1_CR3,T1PSC3,0);          //
+ 121   1        SetBit(TIM1_CR3,T1PSC2,0);
+ 122   1        SetBit(TIM1_CR3,T1PSC1,0);
+ 123   1        SetBit(TIM1_CR3,T1PSC0,0);          //定时器分频 4 ，计数时钟为24MHz
+ 124   1        #elif (TIM1_PSC == TIM1PSC12M)
+                SetBit(TIM1_CR3,T1PSC3,0);          //
+                SetBit(TIM1_CR3,T1PSC2,0);
+                SetBit(TIM1_CR3,T1PSC1,0);
+                SetBit(TIM1_CR3,T1PSC0,1);          //定时器分频 4 ，计数时钟为24MHz
+                #elif (TIM1_PSC == TIM1PSC6M)
+                SetBit(TIM1_CR3,T1PSC3,0);          //
+                SetBit(TIM1_CR3,T1PSC2,0);
+                SetBit(TIM1_CR3,T1PSC1,1);
+                SetBit(TIM1_CR3,T1PSC0,0);          //定时器分频 4 ，计数时钟为24MHz
+                #elif (TIM1_PSC == TIM1PSC3M)
+                SetBit(TIM1_CR3,T1PSC3,0);          //
+                SetBit(TIM1_CR3,T1PSC2,0);
+                SetBit(TIM1_CR3,T1PSC1,1);
+                SetBit(TIM1_CR3,T1PSC0,1);          //定时器分频 8 ，计数时钟为24MHz
+                #elif (TIM1_PSC == TIM1PSC1_5M)
+                SetBit(TIM1_CR3,T1PSC3,0);          //
+                SetBit(TIM1_CR3,T1PSC2,1);
+                SetBit(TIM1_CR3,T1PSC1,0);
+                SetBit(TIM1_CR3,T1PSC0,0);          //定时器分频 16 ，计数时钟为24MHz
+                #elif (TIM1_PSC == TIM1PSC750K)
+                SetBit(TIM1_CR3,T1PSC3,0);          //
+                SetBit(TIM1_CR3,T1PSC2,1);
+                SetBit(TIM1_CR3,T1PSC1,0);
+                SetBit(TIM1_CR3,T1PSC0,1);          //定时器分频 32 ，计数时钟为24MHz
+                #elif (TIM1_PSC == TIM1PSC375K)
+                SetBit(TIM1_CR3,T1PSC3,0);          //
+                SetBit(TIM1_CR3,T1PSC2,1);
+                SetBit(TIM1_CR3,T1PSC1,1);
+                SetBit(TIM1_CR3,T1PSC0,0);          //定时器分频 64 ，计数时钟为24MHz
+                #elif (TIM1_PSC == TIM1PSC187_5K)
+                SetBit(TIM1_CR3,T1PSC3,0);          //
+                SetBit(TIM1_CR3,T1PSC2,1);
+                SetBit(TIM1_CR3,T1PSC1,1);
+                SetBit(TIM1_CR3,T1PSC0,1);          //定时器分频 128 ，计数时钟为24MHz
+                #endif
+ 160   1      
+ 161   1        SetBit(TIM1_CR2,BRS,1);             //位置检测触发定时器复位 BSR 0写入时序复位 1位置检测复位
+ 162   1        TIM1_BARR = 0xFFFF;                 //
+ 163   1        TIM1_BCNTR = 1;         
+ 164   1        SetBit(TIM1_CR3,BCEN,1);            //启动16bit定时器
+ 165   1      
+ 166   1        SetBit(TIM1_CR1,RCEN,0);            //停止Preload定时器
+ 167   1        SetBit(TIM1_CR1,ROPM,1);            //使能OPM模式   单次模式
+ 168   1        TIM1_RARR = 0xffff;
+ 169   1        TIM1_RCNTR = 0xffff;
+ 170   1      
+ 171   1        /********************************************************************
+ 172   1                                                     中断使能
+ 173   1        ********************************************************************/
+ 174   1        TIM1_SR = 0x00;                    //中断标志清零
+ 175   1        SetBit(TIM1_IER,CPIE,0);            //禁止比较中断
+ 176   1        SetBit(TIM1_IER,PDIE,1);            //使能位置检测中断 
+ 177   1        SetBit(TIM1_IER,WTIE,0);            //使能写入时序中断  
+C51 COMPILER V9.52.0.0   FU68XX_MCTIME                                                     08/07/2017 14:18:21 PAGE 4   
+
+ 178   1        SetBit(TIM1_IER,RUIE,0);            //禁止Preload定时器下溢中断
+ 179   1        SetBit(TIM1_IER,BOIE,1);            //使能16bit定时上溢中断
+ 180   1         
+ 181   1        TIM1_DTR  = PWM_DEADTIMENUS*1000.0/41.67-1;
+ 182   1        if(TIM1_DTR < 5)
+ 183   1        {
+ 184   2          TIM1_DTR = 5;
+ 185   2        }
+ 186   1        else if(TIM1_DTR > 500)
+ 187   1        {
+ 188   2          TIM1_DTR = 500;
+ 189   2        }
+ 190   1          
+ 191   1       // DeadTime = (TIM1_DTR+1)/cpuclk,
+ 192   1      /********************************************************************
+ 193   1      使能输出
+ 194   1      OCM = 00：强制输出低电平
+ 195   1      OCM = 01：输出同相PPG（TIM2输出）
+ 196   1      OCM = 10：输出反相PPG（TIM2输出）
+ 197   1      OCM = 11：强制输出高电平
+ 198   1      ********************************************************************/ 
+ 199   1      
+ 200   1        PWMOUT_OFF;                          //
+ 201   1        MOE = 1;                             //使能主输出
+ 202   1      }
+ 203          
+ 204          /*******************************************************************************
+ 205          * Function Name  : TIM2_Config
+ 206          * Description    : Main program.
+ 207          * Input          : None
+ 208          * Output         : None
+ 209          * Return         : None
+ 210          *******************************************************************************/
+ 211          void TIM2_Config(void)
+ 212          {
+ 213   1        /**************************************************************
+ 214   1        Timer 2 时钟分频设置
+ 215   1        000:cpuclk      001:cpuclk/2^1  010:cpuclk/2^2  011:cpuclk/2^3
+ 216   1        100:cpuclk/2^4    101:cpuclk/2^5  110:cpuclk/2^6  111:cpuclk/2^7
+ 217   1        **************************************************************/
+ 218   1        SetBit(TIM2_CR0,T2PSC2,0);
+ 219   1        SetBit(TIM2_CR0,T2PSC1,0);
+ 220   1        SetBit(TIM2_CR0,T2PSC0,0);
+ 221   1      
+ 222   1        SetBit(TIM2_CR0,T2MODE,1);          //工作模式选择：1--输出模式，0--输入模式
+ 223   1        SetBit(TIM2_CR0,T2CES,0);           /*输入Counter模式时有效沿选择：1--上升沿，0--下降沿*/
+ 224   1        SetBit(TIM2_CR0,T2CTM,0);           /*输入模式选择：1--Counter,0--Timer*/ 
+ 225   1      
+ 226   1        /*********************输出比较模式：******************************
+ 227   1        00--强制0 ，                
+ 228   1        01--强制1
+ 229   1        10-- TIMx_CNTR<=TIMx_DR为0 TIMx_CNTR>TIMx_DR为1
+ 230   1        11-- TIMx_CNTR<=TIMx_DR为1 TIMx_CNTR>TIMx_DR为0
+ 231   1        *****************************************************************/
+ 232   1        SetBit(TIM2_CR0,T2OCM1,1);
+ 233   1        SetBit(TIM2_CR0,T2OCM0,1);
+ 234   1      
+ 235   1        /*输出模式：比较匹配中断， 输入Timer模式：PWM周期检测中断，输入Counter模式：输入PWM计数匹配中断 */  
+ 236   1        SetBit(TIM2_CR1,T2IDE,1);       //匹配中断使能
+ 237   1      
+ 238   1        /*输出模式：计数器上溢中断，输入Timer模式：计数器上溢中断，输入Counter模式：基本计数器上溢中断 */  
+ 239   1        SetBit(TIM2_CR1,T2IFE,1);       //上溢中断使能
+C51 COMPILER V9.52.0.0   FU68XX_MCTIME                                                     08/07/2017 14:18:21 PAGE 5   
+
+ 240   1      
+ 241   1        SetBit(TIM2_CR1,T2FE,0);        //输入噪声滤波使能，4CPU CLK    
+ 242   1        SetBit(TIM2_CR1,T2OPM,0);       /*禁止单次计数*/  
+ 243   1      
+ 244   1        TIM2_DR = 300;                    //PWM载波占空比
+ 245   1        TIM2_ARR = PWMARR;                //载波频率 = 24M/1500 =16K
+ 246   1        
+ 247   1        //    SetBit(P1_OE,P10,1);            //使能P1.0数字输出
+ 248   1        //    SetBit(PH_SEL,T2SEL,1);         //使能P1.0作为Timer2引脚输出  
+ 249   1      
+ 250   1        SetBit(TIM2_CR1,T2CEN,1);         /*启动计数*/  
+ 251   1      }
+ 252          
+ 253          /*******************************************************************************
+ 254          * Function Name  : TIM3_Config
+ 255          * Description    : Main program.
+ 256          * Input          : None
+ 257          * Output         : None
+ 258          * Return         : None
+ 259          *******************************************************************************/
+ 260          void TIM3_Config(void)
+ 261          {
+ 262   1        SetBit(TIM3_CR1, T3CEN, 0);                          // 停止计数*/
+ 263   1      
+ 264   1        /*-------------------------------------------------------------------------------------------------
+ 265   1        时钟分频设置(T5PSC)  750k
+ 266   1        000:cpuclk      001:cpuclk/2^1  010:cpuclk/2^2  011:cpuclk/2^3
+ 267   1        100:cpuclk/2^4  101:cpuclk/2^5  110:cpuclk/2^6  111:cpuclk/2^7  
+ 268   1        -------------------------------------------------------------------------------------------------*/
+ 269   1        SetBit(TIM3_CR0, T3PSC2, 1);
+ 270   1        SetBit(TIM3_CR0, T3PSC1, 0);
+ 271   1        SetBit(TIM3_CR0, T3PSC0, 1);
+ 272   1      
+ 273   1        /*-------------------------------------------------------------------------------------------------
+ 274   1        比较输出模式
+ 275   1        OCM = 00：强制输出低电平
+ 276   1        OCM = 01：强制输出高电平
+ 277   1        OCM = 10：PWM模式1，CNTR<DR输出低电平，CNTR>DR输出高电平
+ 278   1        OCM = 11：PWM模式2，CNTR<DR输出高电平，CNTR>DR输出低电平
+ 279   1        -------------------------------------------------------------------------------------------------*/
+ 280   1        SetBit(TIM3_CR0, T3MODE, 1);                            // 选择输出模式       
+ 281   1        SetBit(TIM3_CR0, T3OCM1, 1);
+ 282   1        SetBit(TIM3_CR0, T3OCM0, 0);                             // 输出比较模式2,0-->1
+ 283   1        SetBit(TIM3_CR1, T3FE, 1);                               // 使能输入滤波
+ 284   1      
+ 285   1        CLRFlag_T3IR;
+ 286   1        CLRFlag_T3IP;
+ 287   1        CLRFlag_T3IF;
+ 288   1        SetBit(TIM3_CR1, T3IDE, 0);                              // 禁止输出比较/PWM周期检测中断
+ 289   1        SetBit(TIM3_CR1, T3IFE, 0);                              // 使能溢出中断  
+ 290   1      
+ 291   1        #if (PWMINONOFF_EN)
+ 292   1        {
+ 293   2          TIM3_ARR = 1;                                            // TIM3 Period = 100us       
+ 294   2          TIM3_DR = 0;
+ 295   2          TIM3_CNTR = 1;
+ 296   2          SetBit(TIM3_CR0, T3MODE, 0);                             // 选择输入模式  
+ 297   2          SetBit(TIM3_CR0, T3CTM, 0);                              // 输入定时器模式
+ 298   2          SetBit(P1_OE, P11, 0);                                   // config P21 as input
+ 299   2          SetBit(P1_PU, P11, 1);                                   // enable P21 pull up  
+ 300   2          SetBit(P1_AN, P11, 0);                                   // diasable P21analog function   
+ 301   2          SetBit(TIM3_CR1, T3IDE, 1);                              // 禁止输出比较/PWM周期检测中断
+C51 COMPILER V9.52.0.0   FU68XX_MCTIME                                                     08/07/2017 14:18:21 PAGE 6   
+
+ 302   2          SetBit(PH_SEL, T3SEL, 1);                                // GP11选择Capture Timer输入/输出(for test)
+ 303   2          SetBit(TIM3_CR1, T3IFE, 1);                              // 使能溢出中断  
+ 304   2        }
+ 305   1        #endif
+ 306   1      
+ 307   1        #if (IRONOFF_EN)
+                {
+                  /*PWMPin Config*/
+                  SetBit(P1_OE, P11, 0);                                   // config P21 as input
+                  SetBit(P1_PU, P11, 1);                                   // enable P21 pull up  
+                  SetBit(P1_AN, P11, 0);                                   // diasable P21analog function
+                  CLR(P1IF, P11);                                          // clear P21 interrupt flag
+                  SetBit(P1IE, P11, 1);                                    // config P21 as the source of EXTI1   
+                    
+                  TIM3_ARR = 60000;                                            // TIM3 Period = 100us       
+                  TIM3_DR = TIM3_ARR >> 1;; 
+                  TIM3_CNTR = 1;
+                  SetBit(TIM3_CR1, T3IFE, 1);                              // 使能溢出中断  
+                  
+                }
+                #endif
+ 323   1      
+ 324   1        SetBit(TIM3_CR1, T3CEN, 1);                              // 启动计数  
+ 325   1      }
+ 326          /*******************************************************************************
+ 327          * Function Name  : TIM4_Config 
+ 328          * Description    : Main program. P0.1     做100us定时器用
+ 329          * Input          : None
+ 330          * Output         : None
+ 331          * Return         : None
+ 332          *******************************************************************************/
+ 333          void TIM4_Config(void)
+ 334          {
+ 335   1        //SetBit(PH_SEL, T4SEL, 1);       //GP01选择Capture Timer输入/输出(for test)
+ 336   1        SetBit(TIM4_CR1, T4CEN, 0);         //停止计数*/
+ 337   1      
+ 338   1        /*-----------------------------------------------------------------------------------
+ 339   1        时钟分频设置(T5PSC)
+ 340   1        000:cpuclk      001:cpuclk/2^1  010:cpuclk/2^2  011:cpuclk/2^3
+ 341   1        100:cpuclk/2^4  101:cpuclk/2^5  110:cpuclk/2^6  111:cpuclk/2^7  
+ 342   1        -----------------------------------------------------------------------------------*/     
+ 343   1        SetBit(TIM4_CR0, T4PSC2, 0);
+ 344   1        SetBit(TIM4_CR0, T4PSC1, 0);
+ 345   1        SetBit(TIM4_CR0, T4PSC0, 0);
+ 346   1      
+ 347   1        /*-----------------------------------------------------------------------------------
+ 348   1        比较输出模式
+ 349   1        OCM = 00：强制输出低电平
+ 350   1        OCM = 01：强制输出高电平
+ 351   1        OCM = 10：PWM模式1，CNTR<DR输出低电平，CNTR>DR输出高电平
+ 352   1        OCM = 11：PWM模式2，CNTR<DR输出高电平，CNTR>DR输出低电平
+ 353   1        -----------------------------------------------------------------------------------*/   
+ 354   1        SetBit(TIM4_CR0, T4MODE, 1);      //选择输出模式        
+ 355   1        SetBit(TIM4_CR0, T4OCM1, 1);
+ 356   1        SetBit(TIM4_CR0, T4OCM0, 0);      //输出比较模式2,0-->1
+ 357   1      
+ 358   1        CLR(TIM4_CR1, T4IR);
+ 359   1        CLR(TIM4_CR1, T4IP);
+ 360   1        CLR(TIM4_CR1, T4IF);
+ 361   1        SetBit(TIM4_CR1, T4IDE, 0);       //禁止输出比较/下降沿检测中断和上升沿检测中断                 
+ 362   1        SetBit(TIM4_CR1, T4IFE, 1);       //使能溢出中断  
+ 363   1      
+C51 COMPILER V9.52.0.0   FU68XX_MCTIME                                                     08/07/2017 14:18:21 PAGE 7   
+
+ 364   1        TIM4_ARR = 2400;                  // TIM4 Period = 100us        
+ 365   1        TIM4_DR = TIM4_ARR >> 1; 
+ 366   1        TIM4_CNTR = 1;
+ 367   1      
+ 368   1        SetBit(TIM4_CR1, T4CEN, 1);       //启动计数  
+ 369   1      
+ 370   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    474    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----       1
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

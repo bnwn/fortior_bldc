@@ -1,0 +1,1 @@
+"User\Source\MC_Led.c" LARGE OMF2 WARNINGLEVEL (0) OPTIMIZE (SIZE) BROWSE NOAREGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\MC_Led.lst) TABS (2) OBJECT(.\obj\MC_Led.obj)

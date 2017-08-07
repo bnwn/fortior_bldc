@@ -1,0 +1,160 @@
+C51 COMPILER V9.52.0.0   FU68XX_MCFLASH                                                    08/07/2017 14:18:20 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE FU68XX_MCFLASH
+OBJECT MODULE PLACED IN .\obj\fu68xx_MCflash.obj
+COMPILER INVOKED BY: C:\Keil_v4\C51\BIN\C51.EXE User\Source\fu68xx_MCflash.c LARGE OMF2 WARNINGLEVEL(0) OPTIMIZE(SIZE) B
+                    -ROWSE NOAREGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\fu68xx_MCflash.lst) TABS(2) OBJECT(.\obj\fu68xx
+                    -_MCflash.obj)
+
+line level    source
+
+   1          
+   2          /************************ (C) COPYRIGHT 2015 FT *******************************
+   3          * File Name          : 
+   4          * Author             : Application Team  Tom.wang 
+   5          * Version            : V2.0.0
+   6          * Date               : 06/15/2015
+   7          * Description        : 
+   8          ********************************************************************************
+   9          /*******************************************************************************
+  10          * All Rights Reserved
+  11          *******************************************************************************/
+  12          
+  13          /* Includes ------------------------------------------------------------------*/
+  14          #include <FU68xx.h>
+  15          #include "sys_conf.h"
+  16          #include "fu68xx_MCadc.h"
+  17          #include "fu68xx_MCflash.h"
+  18          
+  19          
+  20          /* Private typedef -----------------------------------------------------------*/
+  21          /* Private define ------------------------------------------------------------*/
+  22          #define STARTPAGEROMADDRESS 0x3C00 
+  23          /* Private macro -------------------------------------------------------------*/
+  24          /* Private variables ---------------------------------------------------------*/
+  25          
+  26          uint8 xdata *PageRomAddress = 0;     //页地址
+  27          uint8 xdata OffsetRomAddressCur = 0; //偏移当前地址 
+  28          uint8 xdata OffsetRomAddressTar = 0; //偏移目标写入地址
+  29          
+  30          u8 xdata WriteRomValue;           //ROM 写入值
+  31          u8 xdata ReadRomValue;            //ROM 读出值
+  32          /* Private function prototypes -----------------------------------------------*/
+  33          /* Private functions ---------------------------------------------------------*/
+  34          u8 Flash_GetAddress(void);
+  35          void Flash_ErasePageRom(void);
+  36          void Flash_KeyWriteValue( u8 value);
+  37          
+  38          /*-------------------------------------------------------------------------------------------------
+  39            Function Name : void Flash_GetAddress(void)
+  40            Description   : 读取Flash当前地址中的值
+  41            Input         : null
+  42            Output        : null
+  43          -------------------------------------------------------------------------------------------------*/
+  44          u8 Flash_GetAddress(void)//
+  45          {
+  46   1        uint8 i;
+  47   1        u8 tevalue;        //临时变量
+  48   1        u8 revalue;        //返回值
+  49   1      
+  50   1        PageRomAddress = STARTPAGEROMADDRESS;
+  51   1        
+  52   1        tevalue = *(uint8 code *)PageRomAddress;
+  53   1        
+C51 COMPILER V9.52.0.0   FU68XX_MCFLASH                                                    08/07/2017 14:18:20 PAGE 2   
+
+  54   1        while(tevalue != 0x7F)
+  55   1        {
+  56   2          PageRomAddress = PageRomAddress + 0x80; 
+  57   2          tevalue = *(uint8 code *)PageRomAddress;
+  58   2          
+  59   2          if(PageRomAddress > 0x3F00)
+  60   2          {
+  61   3            PageRomAddress = STARTPAGEROMADDRESS;        
+  62   3            revalue = 1;
+  63   3            OffsetRomAddressCur = 0;
+  64   3            OffsetRomAddressTar = OffsetRomAddressCur + 1;
+  65   3            Flash_Sector_Write(PageRomAddress,0X7F); 
+  66   3            tevalue = 0x7F;
+  67   3          }      
+  68   2        }
+  69   1      
+  70   1        for(i = 0; i < 128;i++)
+  71   1        {
+  72   2          tevalue = *(uint8 code *)(PageRomAddress + i);
+  73   2          if(tevalue > 0)
+  74   2          {
+  75   3            OffsetRomAddressCur = i;
+  76   3            OffsetRomAddressTar = OffsetRomAddressCur + 1;
+  77   3            revalue = tevalue;
+  78   3          }
+  79   2        }
+  80   1      
+  81   1        return revalue;
+  82   1      }
+  83          
+  84          
+  85          void Flash_ErasePageRom(void)
+  86          {
+  87   1        if(OffsetRomAddressCur >= 127)
+  88   1        { 
+  89   2          OffsetRomAddressCur = 0;
+  90   2          OffsetRomAddressTar = OffsetRomAddressCur + 1;
+  91   2      
+  92   2          Flash_Sector_Erase(PageRomAddress);                   //擦除本页
+  93   2      
+  94   2          if(PageRomAddress < 0x3F00)    
+  95   2          {
+  96   3            PageRomAddress = PageRomAddress + 0x80;
+  97   3          }
+  98   2          else 
+  99   2          {
+ 100   3            PageRomAddress = STARTPAGEROMADDRESS;
+ 101   3          }
+ 102   2          
+ 103   2          Flash_Sector_Write(PageRomAddress + OffsetRomAddressCur, 0x7F);    //首地址写入
+ 104   2        }
+ 105   1      }
+ 106          
+ 107          void Flash_KeyWriteValue( u8 value)
+ 108          {
+ 109   1        u8 key;
+ 110   1        u8 i;
+ 111   1        u8 TempReadRomValue;
+ 112   1      
+ 113   1        key = value; 
+ 114   1      
+ 115   1        TempReadRomValue = ReadRomValue;                       
+C51 COMPILER V9.52.0.0   FU68XX_MCFLASH                                                    08/07/2017 14:18:20 PAGE 3   
+
+ 116   1        
+ 117   1        for(i = 0;((WriteRomValue != TempReadRomValue)&&(i < 5));i++)
+ 118   1        {
+ 119   2          Flash_Sector_Write(PageRomAddress + OffsetRomAddressTar, key);
+ 120   2          TempReadRomValue = *(uint8 code *)(PageRomAddress + OffsetRomAddressTar);
+ 121   2        }
+ 122   1        
+ 123   1        if(WriteRomValue == TempReadRomValue)
+ 124   1        {
+ 125   2          ReadRomValue = TempReadRomValue;
+ 126   2        }                                                                    //读出有效数据
+ 127   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    336    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      6       3
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

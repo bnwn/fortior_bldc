@@ -1,0 +1,292 @@
+C51 COMPILER V9.52.0.0   MC_PWMIN                                                          08/07/2017 14:18:19 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE MC_PWMIN
+OBJECT MODULE PLACED IN .\obj\MC_PwmIn.obj
+COMPILER INVOKED BY: C:\Keil_v4\C51\BIN\C51.EXE User\Source\MC_PwmIn.c LARGE OMF2 WARNINGLEVEL(0) OPTIMIZE(SIZE) BROWSE 
+                    -NOAREGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\MC_PwmIn.lst) TABS(2) OBJECT(.\obj\MC_PwmIn.obj)
+
+line level    source
+
+   1          
+   2          /************************ (C) COPYRIGHT 2015 FT *******************************
+   3          * File Name          : 
+   4          * Author             : Application Team  Tom.wang 
+   5          * Version            : V2.0.0
+   6          * Date               : 06/15/2015
+   7          * Description        : 
+   8          ********************************************************************************
+   9          /*******************************************************************************
+  10          * All Rights Reserved
+  11          *******************************************************************************/
+  12          
+  13          /* Includes ------------------------------------------------------------------*/
+  14          #include <FU68xx.h>
+  15          #include "sys_conf.h"
+  16          #include "MC_UserInterface_layer.h"
+  17          #include "MC_MotorCotrol_layer.h"  
+  18          #include "MC_Beep.h"
+  19          #include "fu68xx_Dmc.h"
+  20          #include "MC_PwmIn.h"
+  21          
+  22          
+  23          /* Private typedef ------------------------------------------------------------------------------*/
+  24          /* Private define -------------------------------------------------------------------------------*/
+  25          /* Private macro --------------------------------------------------------------------------------*/
+  26          /* Private variables ----------------------------------------------------------------------------*/
+  27          PWMINCtl_TypeDef xdata PWMINCtl;
+  28          u8 xdata PwmInResetFlag;
+  29          
+  30          /* Private function prototypes ------------------------------------------------------------------*/
+  31          void PWMINOnOffSwitch(void);
+  32          /* Private functions ----------------------------------------------------------------------------*/
+  33          
+  34          /*-------------------------------------------------------------------------------------------------
+  35          Function Name : void PWMIN_Init(void)
+  36          Description   : PWM检测参数初始化
+  37          Input         : 无
+  38          Output        : 无
+  39          -------------------------------------------------------------------------------------------------*/
+  40          void PWMINInit(void)
+  41          {
+  42   1        float tfAlineA;
+  43   1        #if(PWMINSREF_EN)
+  44   1        PWMINCtl.FlagPWMAline = 0x7F;
+  45   1        #if(BEEPSCAN_EN)
+  46   1        PWMINCtl.FlagPwmIn = 0xF1;
+  47   1        #else
+                PWMINCtl.FlagPwmIn = 0xFF;
+                #endif
+  50   1        PWMINCtl.PWMINStartCnt = 0;  PWMINCtl.PWMINBreakCnt = 0;
+  51   1        PWMINCtl.PWMINHigh = 0;
+  52   1        PWMINCtl.PWMINPeriod = 0;
+  53   1        PWMINCtl.PWMINHighDuty = 0;
+  54   1        PWMINCtl.PWMINHighErr = 0;
+C51 COMPILER V9.52.0.0   MC_PWMIN                                                          08/07/2017 14:18:19 PAGE 2   
+
+  55   1        PWMINCtl.PWMINHighMin = 0;
+  56   1        PWMINCtl.PWMINHighMax = 0;
+  57   1        PWMINCtl.PWMStatus = 255;
+  58   1        PWMINCtl.PWMINIdle = TRUE;
+  59   1        
+  60   1        //PWMIN 默认值
+  61   1        if(!(PWMINCtl.PWMINHighMin && PWMINCtl.PWMINHighMax))
+  62   1        {
+  63   2          PWMINCtl.PWMINHighMin = TempPWMHighMinDefault;
+  64   2          PWMINCtl.PWMINHighMax = TempPWMHighMaxDefault; 
+  65   2        }
+  66   1      
+  67   1        MDUControl.AlineX2 = 32767*((float)PWMINCtl.PWMINHighMax/(float)PWMINCtl.PWMINHighMax);
+  68   1        MDUControl.AlineX1 = 32767*((float)(PWMINCtl.PWMINHighMin + TempMotorONTimeErr)/(float)PWMINCtl.PWMINHig
+             -hMax);
+  69   1      
+  70   1        //MDUControl.SpeedSref = PWMINCtl.PWMINHigh;
+  71   1        MDUControl.SpeedSrefErr = MDUControl.AlineX2 - MDUControl.AlineX1; ;
+  72   1      
+  73   1        tfAlineA= ((float)(SPEED_REF_MAX-SPEED_REF_MIN)/(MDUControl.SpeedSrefErr));
+  74   1        MDUControl.AlineA = (u16)(tfAlineA*32767);
+  75   1        MDUControl.AlineB = (SPEED_REF_MAX - MDUControl.AlineX2*tfAlineA);
+  76   1        
+  77   1      #endif
+  78   1      }
+  79          
+  80          /*-------------------------------------------------------------------------------------------------
+  81          Function Name : void PWMScan(void)
+  82          Description   : //670 ~ 1559
+  83          Input         : 无
+  84          Output        : 无
+  85          -------------------------------------------------------------------------------------------------*/
+  86          void PWMScan(void)
+  87          {
+  88   1      }
+  89          
+  90          /*-------------------------------------------------------------------------------------------------
+  91          Function Name : void PWMINOnOffSwitch(void)
+  92          Description   :  小于900us 刹车  小于920us 停机 大于920us ~2000us 调速
+  93          Input         : 无
+  94          Output        : 无
+  95          -------------------------------------------------------------------------------------------------*/
+  96          
+  97          void PWMINOnOffSwitch(void)
+  98          {
+  99   1        float tfAlineA;
+ 100   1        #if(PWMINSREF_EN)
+ 101   1        if(PWMINCtl.FlagPwmIn == 0xF1)  //上电油门报警或者油门校准 油门信息读取
+ 102   1        {
+ 103   2          if(PWMINCtl.PWMINHigh == 0) //油门报警
+ 104   2          { 
+ 105   3            BeepRequestFun(PWMINError);
+ 106   3            PWMINCtl.FlagPwmIn = 0xF1;
+ 107   3          }
+ 108   2          else if(PWMINCtl.PWMINHigh > TempPWMHighMaxAline) //油门校准动作A
+ 109   2          {
+ 110   3            #if(PWMINALINE_EN)
+ 111   3            PWMINCtl.FlagPwmIn = 0xF1;
+ 112   3            PWMINCtl.PWMINCnt ++;
+ 113   3            if(PWMINCtl.PWMINCnt > 3000)
+ 114   3            {
+ 115   4              PWMINCtl.PWMINCnt = 3000; 
+C51 COMPILER V9.52.0.0   MC_PWMIN                                                          08/07/2017 14:18:19 PAGE 3   
+
+ 116   4              if(PWMINCtl.FlagPWMAline == 0x7F)
+ 117   4              {
+ 118   5                PWMINCtl.PWMINHighMax = PWMINCtl.PWMINHigh - 20; //修正最大值减去 30
+ 119   5                BeepRequestFun(PWMINAline);
+ 120   5              }
+ 121   4            }
+ 122   3            #else
+                    PWMINCtl.PWMINCnt = 0;
+                    PWMINCtl.FlagPwmIn = 0xF1;
+                    if(PWMINCtl.FlagPWMAline = 0x7F)
+                    {
+                      BeepRequestFun(PWMINError);
+                  }      
+                    #endif
+ 130   3          }
+ 131   2          else if(PWMINCtl.PWMINHigh < TempPWMHighMinAline) //油门校准动作B
+ 132   2          {
+ 133   3            PWMINCtl.FlagPwmIn = 0xF1;
+ 134   3            PWMINCtl.PWMINCnt --;
+ 135   3            
+ 136   3            if(Beep.BeepType != PWMINReady)
+ 137   3            {
+ 138   4              if(PWMINCtl.PWMINCnt < -10)
+ 139   4              {
+ 140   5                PWMINCtl.PWMINCnt = -10;
+ 141   5                #if(PWMINALINE_EN)
+ 142   5                if(PWMINCtl.FlagPWMAline == 0xFF)
+ 143   5                {
+ 144   6                  PWMINCtl.PWMINHighMin = PWMINCtl.PWMINHigh;
+ 145   6      //            while(Flash_Sector_Erase((uint8 xdata *)16128)); // 擦写第126扇区（16128~16255）
+ 146   6      //            while(Flash_Sector_Write((uint8 xdata *)16128, PWMINCtl.PWMINHighMin)); // 写最小油门低字节
+ 147   6      //            while(Flash_Sector_Write((uint8 xdata *)16129, (PWMINCtl.PWMINHighMin >> 8))); // 写最低油门
+             -高字节
+ 148   6      //            while(Flash_Sector_Write((uint8 xdata *)16130, PWMINCtl.PWMINHighMax)); // 写最高油门低字节
+ 149   6      //            while(Flash_Sector_Write((uint8 xdata *)16131, (PWMINCtl.PWMINHighMax >> 8))); // 写最高油门
+             -高字节
+ 150   6                }
+ 151   5                PWMINCtl.PWMINHighMin = ((*(unsigned char code *)16129)<<8) + (*(unsigned char code *)16128);
+ 152   5                PWMINCtl.PWMINHighMax = ((*(unsigned char code *)16131)<<8) + (*(unsigned char code *)16130);
+ 153   5                #endif 
+ 154   5                if(!(PWMINCtl.PWMINHighMin && PWMINCtl.PWMINHighMax))
+ 155   5                {
+ 156   6                  PWMINCtl.PWMINHighMin = TempPWMHighMinDefault;
+ 157   6                  PWMINCtl.PWMINHighMax = TempPWMHighMaxDefault; 
+ 158   6                }
+ 159   5              
+ 160   5                MDUControl.AlineX2 = 32767*((float)(PWMINCtl.PWMINHighMax - TempPWMINHighMinFilt)/(float)PWMINCt
+             -l.PWMINHighMax);
+ 161   5                MDUControl.AlineX1 = 32767*((float)(PWMINCtl.PWMINHighMin - TempPWMINHighMinFilt + TempMotorONTi
+             -meErr)/(float)PWMINCtl.PWMINHighMax);
+ 162   5      
+ 163   5                //MDUControl.SpeedSref = PWMINCtl.PWMINHigh;
+ 164   5                MDUControl.SpeedSrefErr = MDUControl.AlineX2 - MDUControl.AlineX1; ;
+ 165   5      
+ 166   5                tfAlineA = ((float)(SPEED_REF_MAX-SPEED_REF_MIN)/(MDUControl.SpeedSrefErr));
+ 167   5                if(tfAlineA > 2.0)
+ 168   5                {
+ 169   6                  tfAlineA = 1.9999;
+ 170   6                }
+ 171   5                MDUControl.AlineA = (u16)(tfAlineA*32767);
+ 172   5                MDUControl.AlineB = (SPEED_REF_MAX - MDUControl.AlineX2*tfAlineA);
+ 173   5      
+C51 COMPILER V9.52.0.0   MC_PWMIN                                                          08/07/2017 14:18:19 PAGE 4   
+
+ 174   5                BeepRequestFun(PWMINReady);
+ 175   5              }
+ 176   4            }
+ 177   3          }
+ 178   2          else                        //油门报警
+ 179   2          {
+ 180   3            PWMINCtl.PWMINCnt = 0;
+ 181   3            PWMINCtl.FlagPwmIn = 0xF1;
+ 182   3            if(PWMINCtl.FlagPWMAline == 0x7F)
+ 183   3            {        BeepRequestFun(PWMINError);
+ 184   4            }
+ 185   3          }
+ 186   2        }
+ 187   1        else                          //PWMIN上电校准完成
+ 188   1        {
+ 189   2           if(PWMINCtl.PWMINHigh == 0) //
+ 190   2          {
+ 191   3            Uc.flg.START = FALSE;
+ 192   3            PWMINCtl.PWMINIdle = TRUE;
+ 193   3            BeepRequestFun(PWMINError);
+ 194   3          }
+ 195   2          if(PWMINCtl.PWMINHigh <= (PWMINCtl.PWMINHighMin + TempMotorOFFTimeErr))
+ 196   2          {
+ 197   3            PWMINCtl.PWMINCnt --;
+ 198   3            if(PWMINCtl.PWMINCnt < -5)
+ 199   3            { 
+ 200   4              PWMINCtl.PWMINCnt = -5;
+ 201   4      
+ 202   4      //        PwmInResetFlag = 0x7F;
+ 203   4              Uc.flg.START = FALSE;
+ 204   4              PWMINCtl.PWMINIdle = TRUE;
+ 205   4              if(Ctl.SysError != NONE)
+ 206   4              {
+ 207   5                Ctl.SysError = NONE;        
+ 208   5                Ctl.State = MOTOR_STOP; 
+ 209   5                DRV_OE_ON;
+ 210   5              }        
+ 211   4              
+ 212   4            }
+ 213   3          }
+ 214   2      //      if(PWMINCtl.PWMINHigh <= (PWMINCtl.PWMINHighMin + TempMotorBreakTime))    //刹车判断
+ 215   2      //      {
+ 216   2      //        PWMINCtl.PWMINBreakCnt++;
+ 217   2      //        if(PWMINCtl.PWMINBreakCnt > 100)
+ 218   2      //        {
+ 219   2      //          PWMINCtl.PWMINBreakCnt = 100;
+ 220   2      //          PwmInResetFlag = 0x7F;
+ 221   2      //          //Ctl.FnStopmodeC = BREAK_DOWN;
+ 222   2      //        }
+ 223   2      //      }
+ 224   2      //      else
+ 225   2      //      {
+ 226   2      //        PWMINCtl.PWMINBreakCnt--;
+ 227   2      //        if(PWMINCtl.PWMINBreakCnt < -100)
+ 228   2      //        {
+ 229   2      //          PWMINCtl.PWMINBreakCnt = -100;
+ 230   2      //          //Ctl.FnStopmodeC = FREE_DOWN;
+ 231   2      //        }
+ 232   2      //      }
+ 233   2          
+ 234   2          else if(PWMINCtl.PWMINHigh > (PWMINCtl.PWMINHighMin + TempMotorONTimeErr))
+ 235   2          {
+C51 COMPILER V9.52.0.0   MC_PWMIN                                                          08/07/2017 14:18:19 PAGE 5   
+
+ 236   3            PWMINCtl.PWMINCnt ++;
+ 237   3            if(PWMINCtl.PWMINCnt > 100)
+ 238   3            {
+ 239   4              PWMINCtl.PWMINCnt = 100;
+ 240   4              if((PwmInResetFlag == 0X7F)&&(Uc.flg.START == FALSE)) 
+ 241   4              {
+ 242   5                Beep.BeepRequest = 0xFF;
+ 243   5      
+ 244   5                Uc.flg.START = TRUE;
+ 245   5                PwmInResetFlag = 0XFF;
+ 246   5              }
+ 247   4            }
+ 248   3          }
+ 249   2        }
+ 250   1        #endif
+ 251   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1320    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =     28       8
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

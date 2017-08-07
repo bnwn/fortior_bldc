@@ -1,0 +1,98 @@
+C51 COMPILER V9.52.0.0   FU68XX_MCLPF                                                      08/07/2017 14:18:20 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE FU68XX_MCLPF
+OBJECT MODULE PLACED IN .\obj\fu68xx_MClpf.obj
+COMPILER INVOKED BY: C:\Keil_v4\C51\BIN\C51.EXE User\Source\fu68xx_MClpf.c LARGE OMF2 WARNINGLEVEL(0) OPTIMIZE(SIZE) BRO
+                    -WSE NOAREGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\fu68xx_MClpf.lst) TABS(2) OBJECT(.\obj\fu68xx_MCl
+                    -pf.obj)
+
+line level    source
+
+   1          
+   2          /************************ (C) COPYRIGHT 2015 FT *******************************
+   3          * File Name          : 
+   4          * Author             : Application Team  Tom.wang 
+   5          * Version            : V2.0.0
+   6          * Date               : 06/15/2015
+   7          * Description        : 
+   8          ********************************************************************************
+   9          /*******************************************************************************
+  10          * All Rights Reserved
+  11          *******************************************************************************/
+  12          
+  13          /* Includes ------------------------------------------------------------------*/
+  14          #include <FU68xx.h>
+  15          #include "sys_conf.h"
+  16          #include "fu68xx_MClpf.h"
+  17          /* Private typedef -----------------------------------------------------------*/
+  18          /* Private define ------------------------------------------------------------*/
+  19          /* Private macro -------------------------------------------------------------*/
+  20          /* Private variables ---------------------------------------------------------*/u8 xdata LPF_DONE = 0X7F 
+             -;
+  21          /* Private function prototypes -----------------------------------------------*/
+  22          uint16 MC_LPF(uint16 tXn1, uint16 tXn0, uint16 tK);
+  23          /* Private functions ---------------------------------------------------------*/
+  24          
+  25          /*******************************************************************************
+  26          * Function Name  : LPF
+  27          * Description    : µÍÍ¨ÂË²¨
+  28          * Input          : None
+  29          * Output         : None
+  30          * Return         : None
+  31          *******************************************************************************/
+  32          uint16 LPF(uint16 Xn1, uint16 Xn0, uint16 K)
+  33          { 
+  34   1        LPF_K = K;
+  35   1        LPF_X = Xn1;
+  36   1        LPF_Y = Xn0;  
+  37   1        SetBit(PL_CR, LPFSTA, 1);
+  38   1        _nop_();
+  39   1        _nop_();
+  40   1        _nop_();
+  41   1        _nop_();
+  42   1        _nop_();
+  43   1        _nop_();
+  44   1        _nop_();
+  45   1        _nop_();
+  46   1        _nop_();
+  47   1        _nop_();
+  48   1        return LPF_Y;
+  49   1      }
+  50          
+  51          uint16 MC_LPF(uint16 tXn1, uint16 tXn0, uint16 tK)
+  52          {
+C51 COMPILER V9.52.0.0   FU68XX_MCLPF                                                      08/07/2017 14:18:20 PAGE 2   
+
+  53   1        uint16 MC_LPF_Y;
+  54   1      
+  55   1        if(LPF_DONE == 0X7F)
+  56   1        {
+  57   2          LPF_DONE = 0XFF;               //Ã¦
+  58   2          MC_LPF_Y = LPF(tXn1,tXn0,tK);
+  59   2          LPF_DONE = 0x7F;               //¿ÕÏÐ
+  60   2          return MC_LPF_Y;
+  61   2        }
+  62   1        else
+  63   1        {
+  64   2          ;//return tXn0;
+  65   2        }
+  66   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     72    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      1       2
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

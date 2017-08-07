@@ -1,0 +1,14 @@
+C51 COMPILER V9.52.0.0   FTECH_BLDCV2_3                                                    06/23/2016 18:01:59 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE FTECH_BLDCV2_3
+OBJECT MODULE PLACED IN .\obj\Ftech_BLDCV2.3.obj
+COMPILER INVOKED BY: d:\Keil c51_fu68xx\C51\BIN\C51.EXE User\Source\Ftech_BLDCV2.3.c LARGE OMF2 WARNINGLEVEL(0) OPTIMIZE
+                    -(SIZE) BROWSE NOAREGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\Ftech_BLDCV2.3.lst) TABS(2) OBJECT(.\ob
+                    -j\Ftech_BLDCV2.3.obj)
+
+line level    source
+
+*** ERROR C318 OF User\Source\Ftech_BLDCV2.3.c: can't open file 'User\Source\Ftech_BLDCV2.3.c'
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  1 ERROR(S)

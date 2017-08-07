@@ -1,0 +1,477 @@
+C51 COMPILER V9.52.0.0   MC_MOTORFUNCTION_LAYER                                            08/07/2017 14:18:18 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE MC_MOTORFUNCTION_LAYER
+OBJECT MODULE PLACED IN .\obj\MC_MotorFunction_layer.obj
+COMPILER INVOKED BY: C:\Keil_v4\C51\BIN\C51.EXE User\Source\MC_MotorFunction_layer.c LARGE OMF2 WARNINGLEVEL(0) OPTIMIZE
+                    -(SIZE) BROWSE NOAREGS INCDIR(.\Library\Include;.\User\Include) DEBUG PRINT(.\obj\MC_MotorFunction_layer.lst) TABS(2) OBJ
+                    -ECT(.\obj\MC_MotorFunction_layer.obj)
+
+line level    source
+
+   1          
+   2          /************************ (C) COPYRIGHT 2015 FT *******************************
+   3          * File Name          : 
+   4          * Author             : Application Team  Tom.wang 
+   5          * Version            : V2.0.0
+   6          * Date               : 06/15/2015
+   7          * Description        : 
+   8          ********************************************************************************
+   9          /*******************************************************************************
+  10          * All Rights Reserved
+  11          *******************************************************************************/
+  12          
+  13          /* Includes ------------------------------------------------------------------*/
+  14          #include <FU68xx.h>
+  15          #include <Myproject.h>
+  16          
+  17          /** @addtogroup FT68xx
+  18            * @{
+  19            */
+  20          
+  21          /* Private typedef -----------------------------------------------------------*/
+  22          /* Private define ------------------------------------------------------------*/
+  23          /* Private macro -------------------------------------------------------------*/
+  24          /* Private variables ---------------------------------------------------------*/
+  25          Power_TypeDef xdata Power;  
+  26          /* Private function prototypes -----------------------------------------------*/
+  27          float Drv_PowerThermCalc(u16 VthMeas);      //温度计算
+  28          u32 Drv_RotorCircleNumCalc(u8 value);       //运行圈数计算
+  29          void MCL_OverLoadInit(u16 OL0A,u16 OL1A,u16 OL2A,u16 OL3A,u32 OL0ms,u32 OL1ms,u32 OL2ms,u32 OL3ms);
+  30          u8 MCL_OverLoadCalc(u16 Ibus);              //过载计算
+  31          
+  32          void Mcl_MotorRestart(void);                //电机重启
+  33          u8 Mcl_StallRestart(void);                  //堵转重启
+  34          void Mcl_NoloadCale(void);                  //空载判断
+  35          void Drv_PowerClosedCalc(void);             //--
+  36          void Drv_Stb3Calc(void);                    //失速判断
+  37          void Drv_BemfSetFRFun(void);                //电调转向设定
+  38          
+  39          /* Private functions ---------------------------------------------------------*/
+  40          
+  41          
+  42          /*******************************************************************************
+  43          * Function Name  : MCL_Inverter_OverCurrentInit    //过载 
+  44          * Description    : 
+  45          * Input          : PTC温度
+  46          * Output         : None
+  47          * Return         : ADC采集值
+  48          *******************************************************************************/
+  49          
+  50          #if(OVERLOAD_EN)
+              void MCL_OverLoadInit(u16 OL0A,u16 OL1A,u16 OL2A,u16 OL3A,
+                                    u32 OL0ms,u32 OL1ms,u32 OL2ms,u32 OL3ms)
+                {
+C51 COMPILER V9.52.0.0   MC_MOTORFUNCTION_LAYER                                            08/07/2017 14:18:18 PAGE 2   
+
+                  Ctl.OL.Value = 0x7F; 
+                  Ctl.OL.Group[0].Current = OL0A;
+                  Ctl.OL.Group[1].Current = OL1A;
+                  Ctl.OL.Group[2].Current = OL2A;
+                  Ctl.OL.Group[3].Current = OL3A;
+              
+                  Ctl.OL.Group[0].Nms = OL0ms;
+                  Ctl.OL.Group[1].Nms = OL1ms;
+                  Ctl.OL.Group[2].Nms = OL2ms;
+                  Ctl.OL.Group[3].Nms = OL3ms;
+                    
+                  Ctl.OL.Group[0].msCounter = 0;
+                  Ctl.OL.Group[1].msCounter = 0;
+                  Ctl.OL.Group[2].msCounter = 0;
+                  Ctl.OL.Group[3].msCounter = 0;
+                  
+                  Ctl.OL.Group[0].flg = 0;
+                  Ctl.OL.Group[1].flg = 0;
+                  Ctl.OL.Group[2].flg = 0;
+                  Ctl.OL.Group[3].flg = 0;
+                }
+              #endif
+  76          
+  77          
+  78           /******************************************************************************* 
+  79          * Function Name  : MCL_Chk_Inverter_OverCurrent 
+  80          * Author         : wangt  
+  81          * Description     
+  82          * Input          : None 
+  83          * Output         : None 
+  84          * Return         : ?OR? 
+  85          *******************************************************************************/  
+  86          #if(OVERLOAD_EN) 
+              u8 MCL_OverLoadCalc(u16 Ibus)   
+                { 
+                  u16 tIbus = 0;    //输入电流值
+                  tIbus = Ibus;
+              
+                  if((Ctl.OL.msFlag == 0x7F)&&(Ctl.OL.Value == 0x7F)&&(Ctl.State == MOTOR_NORMAL))
+                    {
+                      if(tIbus >= Ctl.OL.Group[0].Current)    
+                        {  
+                           Ctl.OL.Group[0].msCounter++;
+                           if(tIbus >= Ctl.OL.Group[1].Current)  
+                           {
+                               Ctl.OL.Group[0].msCounter++;
+                               Ctl.OL.Group[1].msCounter++;
+                               if(tIbus >= Ctl.OL.Group[2].Current) 
+                               {
+                                   Ctl.OL.Group[0].msCounter++;
+                                   Ctl.OL.Group[1].msCounter++;
+                                   Ctl.OL.Group[2].msCounter++;
+                                   if(tIbus>=Ctl.OL.Group[3].Current) 
+                                   {  
+                                       Ctl.OL.Group[0].msCounter++;
+                                       Ctl.OL.Group[1].msCounter++;
+                                       Ctl.OL.Group[2].msCounter++;
+                                       Ctl.OL.Group[3].msCounter++;
+                                   }
+                                   else
+                                   {
+                                      Ctl.OL.Group[3].msCounter--;  
+C51 COMPILER V9.52.0.0   MC_MOTORFUNCTION_LAYER                                            08/07/2017 14:18:18 PAGE 3   
+
+                                   }
+                               }
+                               else
+                               {
+                                   Ctl.OL.Group[2].msCounter--;  
+                                   Ctl.OL.Group[3].msCounter--;  
+                               }
+                           }
+                           else
+                           {
+                               Ctl.OL.Group[1].msCounter--;  
+                               Ctl.OL.Group[2].msCounter--;  
+                               Ctl.OL.Group[3].msCounter--;                
+                           }
+                        }
+                        else
+                        {   
+                           Ctl.OL.Group[0].msCounter--; 
+                           Ctl.OL.Group[1].msCounter--;  
+                           Ctl.OL.Group[2].msCounter--;  
+                           Ctl.OL.Group[3].msCounter--;  
+                        } 
+                     if(Ctl.OL.Group[0].msCounter >= Ctl.OL.Group[0].Nms) 
+                     {
+                       Ctl.OL.Group[0].flg = TRUE;
+                       Ctl.OL.Value = 0xF0; 
+                     }
+                     if(Ctl.OL.Group[1].msCounter >= Ctl.OL.Group[1].Nms)
+                     {
+                       Ctl.OL.Group[1].flg = TRUE; 
+                       Ctl.OL.Value = 0xF1; 
+                     }
+                     if(Ctl.OL.Group[2].msCounter >= Ctl.OL.Group[2].Nms)
+                     {
+                       Ctl.OL.Group[2].flg = TRUE; 
+                       Ctl.OL.Value = 0xF2; 
+                     }
+                     if(Ctl.OL.Group[3].msCounter >= Ctl.OL.Group[3].Nms)
+                     {
+                       Ctl.OL.Group[3].flg = TRUE;  
+                       Ctl.OL.Value = 0xF3; 
+                     }
+                     
+                     if(Ctl.OL.Group[0].msCounter<-100)
+                     {
+                       Ctl.OL.Group[0].msCounter = -100; 
+                     }
+                     if(Ctl.OL.Group[1].msCounter<-100)
+                     {
+                       Ctl.OL.Group[1].msCounter = -100;  
+                     }
+                     if(Ctl.OL.Group[2].msCounter<-100)
+                     {
+                       Ctl.OL.Group[2].msCounter = -100;  
+                     }
+                     if(Ctl.OL.Group[3].msCounter<-100)       {
+                       Ctl.OL.Group[3].msCounter = -100;  
+                     }
+              
+                     Ctl.OL.msFlag = 0;
+                    }   
+                  return Ctl.OL.Value; 
+C51 COMPILER V9.52.0.0   MC_MOTORFUNCTION_LAYER                                            08/07/2017 14:18:18 PAGE 4   
+
+                } 
+              #endif
+ 180            
+ 181          /*******************************************************************************
+ 182          * Function Name  : Drv_PowerThermCalc    
+ 183          * Description    : 
+ 184          * Input          : PTC温度
+ 185          * Output         : None
+ 186          * Return         : ADC采集值
+ 187          *******************************************************************************/
+ 188          float Drv_PowerThermCalc(u16 VthMeas)
+ 189            {
+ 190   1          u16 tVthMeas;
+ 191   1          float tTherm;
+ 192   1      
+ 193   1          tVthMeas =  VthMeas;
+ 194   1      
+ 195   1          if(tVthMeas<=8130)           
+ 196   1            {
+ 197   2              tTherm = 20.0;
+ 198   2            }
+ 199   1          else if(tVthMeas<=9320)
+ 200   1            {
+ 201   2              tTherm = 25.0;        
+ 202   2            }
+ 203   1          else if(tVthMeas<11869)
+ 204   1            {
+ 205   2              tTherm = 30.0;        
+ 206   2            }
+ 207   1          else if(tVthMeas<14016)
+ 208   1            {
+ 209   2              tTherm = 40.0;        
+ 210   2            }
+ 211   1          else if(tVthMeas<17134)
+ 212   1            {
+ 213   2              tTherm = 50.0;        
+ 214   2            }
+ 215   1          else if(tVthMeas<19578)
+ 216   1            {
+ 217   2              tTherm = 60.0;        
+ 218   2            }
+ 219   1          else if(tVthMeas<21770)
+ 220   1            {
+ 221   2              tTherm = 70.0;        
+ 222   2            }
+ 223   1          else if(tVthMeas<23672)
+ 224   1            {
+ 225   2              tTherm = 80.0;        
+ 226   2            }
+ 227   1          else if(tVthMeas<25278)
+ 228   1            {
+ 229   2              tTherm = 90.0;        
+ 230   2            }
+ 231   1          else if(tVthMeas<26611)
+ 232   1            {
+ 233   2              tTherm = 100.0;        
+ 234   2            }
+ 235   1          else if(tVthMeas<27704)
+ 236   1            {
+ 237   2              tTherm = 110.0;
+ 238   2            }
+ 239   1          else if(tVthMeas<30000)
+C51 COMPILER V9.52.0.0   MC_MOTORFUNCTION_LAYER                                            08/07/2017 14:18:18 PAGE 5   
+
+ 240   1            {
+ 241   2              tTherm = 120.0;
+ 242   2            }
+ 243   1          else
+ 244   1          {
+ 245   2            tTherm = 200;
+ 246   2          }
+ 247   1          return tTherm;      
+ 248   1        }  
+ 249          
+ 250          /*******************************************************************************
+ 251          * Function Name  : Drv_RotorCircleNumCalc    
+ 252          * Description    : 
+ 253          * Input          : PTC温度
+ 254          * Output         : None
+ 255          * Return         : ADC采集值
+ 256          *******************************************************************************/
+ 257          #if(MOTORCIRCLECALEEN)
+              u32 Drv_RotorCircleNumCalc(u8 value)   //Ctl.Step
+              {  
+                s32 CircleNum;        
+                s8 StepERR; 
+                Ctl.spd.RotorPosition = value;
+              
+                StepERR = Ctl.spd.RotorPosition - Ctl.spd.RotorPositionqPre;
+                if(StepERR == 5)
+                {
+                  StepERR = -1;
+                }
+                else if(StepERR == -5)
+                {
+                  StepERR = 1;
+                }
+                if(StepERR  == -1) 
+                {
+                  Ctl.spd.ComNum--;
+                }    
+                else if(StepERR == 1)
+                {
+                  Ctl.spd.ComNum++;
+                }    
+              
+                Ctl.spd.RotorPositionqPre = Ctl.spd.RotorPosition; 
+              
+                CircleNum =  Ctl.spd.ComNum/(6*Ctl.Motor.PolePairs);  
+                
+                return CircleNum;  
+              }
+              #endif
+ 289          
+ 290          /*******************************************************************************
+ 291          * Function Name  : Mcl_MotorRestart    
+ 292          * Description    : 重启参数清零
+ 293          * Input          : 
+ 294          * Output         : 
+ 295          * Return         : 
+ 296          *******************************************************************************/
+ 297          void Mcl_MotorRestart(void)
+ 298          {
+ 299   1        DRV_OE_ON;
+ 300   1        Ctl.SysError = NONE;     
+ 301   1        Ctl.State = MOTOR_READY;
+C51 COMPILER V9.52.0.0   MC_MOTORFUNCTION_LAYER                                            08/07/2017 14:18:18 PAGE 6   
+
+ 302   1      }
+ 303          
+ 304          /*******************************************************************************
+ 305          * Function Name  : Mcl_StallRestart    
+ 306          * Description    : 堵转重启
+ 307          * Input          : 
+ 308          * Output         : 
+ 309          * Return         : 
+ 310          *******************************************************************************/
+ 311          u8 Mcl_StallRestart(void)             //堵转重启
+ 312          {
+ 313   1        //if(Ctl.Stall.u8Num < STALLRESTARTNUM)
+ 314   1        {
+ 315   2          Ctl.Stall.u8Num++;
+ 316   2          Ctl.Tim.STAnms = 0;
+ 317   2          Ctl.Tim.STB1nms = 0;
+ 318   2          Ctl.Tim.STB2nms = 0;
+ 319   2          Ctl.Stall.u8FL = 0;
+ 320   2      
+ 321   2          Mcl_MotorRestart();
+ 322   2        }
+ 323   1        return 1;
+ 324   1      }
+ 325          
+ 326          /*******************************************************************************
+ 327          * Function Name  : Mcl_NoloadCale    
+ 328          * Description    : 电机空载判断
+ 329          * Input          : 
+ 330          * Output         : 
+ 331          * Return         : 
+ 332          *******************************************************************************/
+ 333          void Mcl_NoloadCale(void)            
+ 334          {
+ 335   1        if(Ctl.Noload.Counter > NOLOADNUM)
+ 336   1        {
+ 337   2           if(Ctl.Noload.Counter > (NOLOADNUM))
+ 338   2           {
+ 339   3             Ctl.Noload.Counter = (NOLOADNUM);
+ 340   3           }
+ 341   2           Ctl.Noload.Flag = 0X7F;
+ 342   2        }
+ 343   1        else
+ 344   1        {
+ 345   2          Ctl.Noload.Flag = 0XFF;
+ 346   2        }
+ 347   1      }
+ 348          
+ 349          /*******************************************************************************
+ 350          * Function Name  : Drv_PowerClosedCalc
+ 351          * Description    : 测试程序
+ 352          * Input          : 
+ 353          * Output         : None
+ 354          * Return         : 
+ 355          *******************************************************************************/
+ 356          void Drv_PowerClosedCalc(void)
+ 357          {
+ 358   1        Power.err = Power.ref - Power.fdb;
+ 359   1        if(Power.err > 0)  
+ 360   1        {
+ 361   2          Drv.PWM.DutytargetOpen += 20;
+ 362   2        }
+ 363   1        else
+C51 COMPILER V9.52.0.0   MC_MOTORFUNCTION_LAYER                                            08/07/2017 14:18:18 PAGE 7   
+
+ 364   1        {
+ 365   2          Drv.PWM.DutytargetOpen -= 20;
+ 366   2        }  
+ 367   1      }
+ 368          
+ 369          /*******************************************************************************
+ 370          * Function Name  : Drv_Stb3Calc
+ 371          * Description    : 失速检测
+ 372          * Input          : 
+ 373          * Output         : None
+ 374          * Return         : 
+ 375          *******************************************************************************/
+ 376          void Drv_Stb3Calc(void)
+ 377          {
+ 378   1        #if(STB3_EN)
+                if(Ctl.Section.Counter < 2)
+                {
+                  ;
+                }
+                else //if(Ctl.Section.Counter < STB3WAIT)
+                {
+                  if(((Ctl.Section.Cur >> 1) > Ctl.Section.Per)||(Ctl.Section.Cur < (Ctl.Section.Per>>1)))
+                  {
+                    Ctl.Section.ErrCounter += 2 ;
+                    if(Ctl.Section.ErrCounter >= STB3ERRVALUE)
+                    {
+                      Ctl.SysError = E_STB3;
+                      Ctl.Section.ErrCounter = 0;
+                    }
+                  }
+                  else
+                  {
+                    if(Ctl.Section.ErrCounter > 0)
+                    {
+                      Ctl.Section.ErrCounter--;
+                    }
+                  }
+                }
+              //  else 
+              //  {
+              //    Ctl.Section.Counter = STB3WAIT;
+              //  }
+                Ctl.Section.Per = Ctl.Section.Cur;
+                #endif 
+ 408   1      }
+ 409          
+ 410          /*******************************************************************************
+ 411          * Function Name  : Drv_BemfSetFRFun
+ 412          * Description    : 电调方向设定
+ 413          * Input          : 
+ 414          * Output         : None
+ 415          * Return         : 
+ 416          *******************************************************************************/
+ 417          void Drv_BemfSetFRFun(void)
+ 418          {
+ 419   1        if(Drv.Stk.BemfSetFR == 0x00)
+ 420   1        {
+ 421   2          Drv.Stk.Calcnms = 0;
+ 422   2        }
+ 423   1        if(Drv.Stk.BemfFR!=0xFF)
+ 424   1        {
+ 425   2          if(Drv.Stk.BemfSetFR == 0)
+C51 COMPILER V9.52.0.0   MC_MOTORFUNCTION_LAYER                                            08/07/2017 14:18:18 PAGE 8   
+
+ 426   2          {
+ 427   3            while(Flash_Sector_Write((uint8 xdata *)BemfSetFRRomAddress, Drv.Stk.BemfFR)); 
+ 428   3            Drv.Stk.BemfSetFR = Drv.Stk.BemfFR;
+ 429   3            Uc.flg.FR  = Drv.Stk.BemfFR;
+ 430   3            Ctl.direction = Uc.flg.FR;
+ 431   3          }
+ 432   2        }
+ 433   1      }
+ 434          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    481    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      6       4
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
